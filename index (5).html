@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Escalas 6x1 — Kavak</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #1a237e;
+  --navy-light: #283593;
+  --navy-bg: #0d1442;
+  --green: #2e7d32;
+  --green-bg: #e8f5e9;
+  --red: #c62828;
+  --red-bg: #ffebee;
+  --orange: #e65100;
+  --orange-bg: #fff3e0;
+  --blue-bg: #bbdefb;
+  --blue: #1565c0;
+  --purple: #6a1b9a;
+  --teal: #00695c;
+  --bg: #f0f2f5;
+  --white: #ffffff;
+  --border: #e0e0e0;
+  --text: #333;
+  --text-light: #666;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0,0,0,.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,.2);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+input,select,button,textarea { font-family:inherit; }
+.hidden { display:none!important; }
+
+/* Login */
+#loginScreen { min-height:100vh; background:linear-gradient(135deg,var(--navy-bg),var(--navy),var(--navy-light)); display:flex; align-items:center; justify-content:center; }
+.login-box { background:var(--white); border-radius:16px; padding:40px; width:400px; max-width:92vw; box-shadow:var(--shadow-lg); }
+.login-box .logo { text-align:center; margin-bottom:28px; }
+.login-box .logo .icon { font-size:48px; margin-bottom:8px; }
+.login-box .logo h1 { font-size:22px; color:var(--navy); font-weight:700; }
+.login-box .logo p { font-size:13px; color:var(--text-light); margin-top:6px; }
+.login-box label { font-size:12px; font-weight:600; color:#444; display:block; margin-bottom:4px; }
+.login-box input { width:100%; padding:10px 14px; border:2px solid var(--border); border-radius:var(--radius); font-size:14px; margin-bottom:16px; outline:none; transition:border .2s; }
+.login-box input:focus { border-color:var(--navy); }
+.login-box .error { background:var(--red-bg); color:var(--red); padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:14px; font-weight:600; }
+.login-box .btn-login { width:100%; padding:12px; background:linear-gradient(135deg,var(--navy),var(--navy-light)); color:#fff; border:none; border-radius:var(--radius); font-size:15px; font-weight:700; cursor:pointer; transition:transform .15s; }
+.login-box .btn-login:hover { transform:scale(1.02); }
+
+/* Header */
+.header { background:linear-gradient(135deg,var(--navy),var(--navy-light)); color:#fff; padding:14px 20px; }
+.header-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.header h1 { font-size:20px; font-weight:700; }
+.header p { font-size:12px; opacity:.85; margin-top:2px; }
+.header-badges { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.badge { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap; }
+.badge-crit { background:var(--red); }
+.badge-crit.ok { background:var(--green); }
+.badge-warn { background:var(--orange); }
+.badge-warn.ok { background:var(--green); }
+.btn-notif { position:relative; background:rgba(255,255,255,.15); border:none; color:#fff; padding:5px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600; }
+.btn-notif .count { position:absolute; top:-4px; right:-4px; background:var(--red); color:#fff; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; }
+.user-info { border-left:1px solid rgba(255,255,255,.3); padding-left:10px; display:flex; align-items:center; gap:8px; }
+.user-info span { font-size:12px; opacity:.9; }
+.btn-sm { background:rgba(255,255,255,.15); border:none; color:#fff; padding:3px 10px; border-radius:12px; font-size:11px; cursor:pointer; transition:background .2s; }
+.btn-sm:hover { background:rgba(255,255,255,.3); }
+
+/* Period bar */
+.period-bar { padding:10px 20px; background:var(--white); border-bottom:2px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.btn-period { display:flex; align-items:center; gap:8px; padding:8px 16px; background:#e8eaf6; border:2px solid var(--navy); border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:700; color:var(--navy); position:relative; }
+.dropdown { position:absolute; top:100%; left:0; margin-top:4px; background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow-lg); border:1px solid var(--border); z-index:99; min-width:260px; max-height:350px; overflow-y:auto; }
+.dropdown-header { padding:8px 14px; background:#f5f5f5; font-size:11px; font-weight:600; color:var(--text-light); border-bottom:1px solid #eee; }
+.dropdown-item { display:flex; align-items:center; gap:10px; width:100%; padding:10px 14px; border:none; border-bottom:1px solid #f0f0f0; background:var(--white); cursor:pointer; text-align:left; font-family:inherit; font-size:13px; transition:background .15s; }
+.dropdown-item:hover { background:#f5f5ff; }
+.dropdown-item.active { background:#e8eaf6; font-weight:700; color:var(--navy); }
+.btn-validate { padding:8px 18px; color:#fff; border:none; border-radius:var(--radius); font-size:13px; font-weight:700; cursor:pointer; transition:transform .15s; }
+.btn-validate:hover { transform:scale(1.02); }
+.validated-badge { background:var(--green-bg); color:var(--green); padding:6px 14px; border-radius:var(--radius); font-size:12px; font-weight:600; }
+
+/* Filters */
+.filters-bar { padding:10px 20px; background:var(--white); border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.filters-bar label { font-size:12px; font-weight:600; }
+.filters-bar select { margin-left:6px; padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px; }
+.btn-gestor { display:flex; align-items:center; gap:6px; padding:6px 14px; background:#e8eaf6; border:2px solid var(--navy); border-radius:var(--radius); cursor:pointer; font-size:12px; font-weight:600; color:var(--navy); position:relative; }
+
+/* Tabs */
+.tabs { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+.tab-btn { padding:5px 14px; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all .2s; font-family:inherit; }
+
+/* Legend */
+.legend-bar { padding:6px 20px; background:#fafafa; border-bottom:1px solid #eee; display:flex; gap:8px; flex-wrap:wrap; }
+.legend-item { font-size:10px; padding:2px 8px; border-radius:10px; font-weight:700; }
+
+/* Grid */
+.grid-wrap { padding:12px 8px; }
+.grid-scroll { overflow-x:auto; background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); }
+.grid-table { border-collapse:collapse; font-size:11px; width:100%; }
+.grid-table thead th { padding:5px 6px; background:var(--navy-light); color:#fff; white-space:nowrap; font-weight:600; font-size:10px; position:relative; }
+.grid-table thead th.sticky { position:sticky; z-index:3; background:var(--navy-light); }
+.grid-table tbody td { padding:3px 6px; font-size:11px; border-bottom:1px solid #f0f0f0; }
+.grid-table tbody td.sticky { position:sticky; z-index:1; }
+.dept-row td { padding:6px 14px!important; color:#fff; font-weight:700; font-size:12px; background:var(--navy)!important; }
+.sun-col { background:#e8eaf6; }
+
+/* Cell */
+.cell { width:48px; height:28px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:4px; font-weight:700; font-size:11px; cursor:pointer; user-select:none; transition:all .15s; margin:0 auto; }
+.cell:hover { box-shadow:0 0 0 2px var(--navy); }
+.cell.err { border:2px solid var(--red)!important; }
+.cell-T { background:var(--green-bg); color:var(--green); }
+.cell-DSR { background:var(--blue-bg); color:var(--blue); }
+.cell-F { background:var(--red-bg); color:var(--red); }
+.cell-empty { background:#fafafa; color:#ccc; }
+.cell select { width:48px; height:28px; border:1px solid #90a4ae; border-radius:4px; font-weight:700; font-size:10px; text-align:center; cursor:pointer; outline:none; padding:0; font-family:inherit; }
+
+/* Status */
+.status-btn { border:none; border-radius:12px; padding:2px 8px; font-size:10px; cursor:pointer; font-weight:700; }
+.status-crit { background:var(--red); color:#fff; }
+.status-warn { background:var(--orange); color:#fff; }
+.status-ok { color:var(--green); font-weight:700; font-size:12px; }
+.btn-6x1 { background:none; border:1px solid var(--navy); border-radius:3px; cursor:pointer; font-size:9px; color:var(--navy); padding:1px 4px; font-weight:700; }
+.btn-icon { background:none; border:none; cursor:pointer; font-size:10px; padding:0; }
+
+/* Alerts View */
+.alerts-wrap { padding:16px 20px; max-width:900px; }
+.alert-card { background:var(--white); border-radius:var(--radius); padding:14px; margin-bottom:10px; box-shadow:var(--shadow); }
+.alert-item { display:flex; align-items:flex-start; gap:8px; padding:6px 10px; margin-bottom:4px; border-radius:6px; border-left:4px solid; }
+.alert-item.critical { background:var(--red-bg); border-left-color:var(--red); }
+.alert-item.warning { background:var(--orange-bg); border-left-color:var(--orange); }
+
+/* Logs */
+.logs-wrap { padding:16px 20px; max-width:1000px; }
+.logs-table { width:100%; border-collapse:collapse; font-size:12px; background:var(--white); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); }
+.logs-table thead th { background:var(--navy-light); color:#fff; padding:8px 10px; text-align:left; font-size:11px; }
+.logs-table tbody td { padding:6px 10px; border-bottom:1px solid #eee; font-size:11px; }
+.logs-table tbody tr.post-val { background:var(--orange-bg); }
+
+/* Modals */
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:200; }
+.modal { background:var(--white); border-radius:12px; padding:28px; max-width:92vw; max-height:85vh; overflow:auto; }
+.modal h3 { margin:0 0 16px; font-size:16px; color:var(--navy); }
+.modal label { font-size:12px; font-weight:600; display:block; margin-bottom:4px; }
+.modal input,.modal select { width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:10px; }
+.modal .btns { display:flex; gap:8px; margin-top:6px; }
+.modal .btn-primary { flex:1; padding:10px; background:var(--navy); color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; }
+.modal .btn-cancel { flex:1; padding:10px; background:#eee; border:none; border-radius:6px; cursor:pointer; }
+
+/* Notif panel */
+.notif-panel { position:fixed; top:60px; right:20px; width:400px; max-width:90vw; max-height:70vh; overflow:auto; background:var(--white); border-radius:12px; box-shadow:var(--shadow-lg); z-index:200; border:1px solid var(--border); }
+.notif-header { padding:12px 16px; background:var(--navy); color:#fff; border-radius:12px 12px 0 0; display:flex; justify-content:space-between; align-items:center; }
+.notif-item { padding:10px 16px; border-bottom:1px solid #f0f0f0; }
+.notif-item.unread { background:#e8eaf6; }
+
+/* Toast */
+.toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:300; padding:12px 24px; border-radius:10px; font-weight:600; font-size:13px; box-shadow:var(--shadow-lg); color:#fff; animation:slideDown .3s; }
+@keyframes slideDown { from{opacity:0;transform:translateX(-50%) translateY(-20px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+.toast-success { background:var(--green); }
+.toast-error { background:var(--red); }
+.toast-warning { background:var(--orange); }
+.toast-info { background:var(--navy); }
+
+/* Backdrop */
+.backdrop { position:fixed; inset:0; z-index:98; }
+
+/* Responsive */
+@media(max-width:600px) {
+  .header h1 { font-size:16px; }
+  .user-info { border:none; padding:0; }
+  .tabs { margin-left:0; width:100%; }
+  .modal { width:95vw!important; padding:20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========= LOGIN ========= -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="logo">
+      <div class="icon">📋</div>
+      <h1>Sistema de Escalas 6x1</h1>
+      <p>Kavak — Controle de Folgas</p>
+    </div>
+    <label>Usuário</label>
+    <input id="loginUser" placeholder="seu.email@kavak.com" autocomplete="off">
+    <label>Senha</label>
+    <input id="loginPass" type="password" placeholder="••••••••">
+    <div id="loginError" class="error hidden"></div>
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- ========= APP ========= -->
+<div id="app" class="hidden">
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <h1>📋 Sistema de Escalas 6x1</h1>
+        <p>Kavak — Validação automática CLT</p>
+      </div>
+      <div class="header-badges">
+        <span id="badgeCrit" class="badge badge-crit">⛔ 0 críticos</span>
+        <span id="badgeWarn" class="badge badge-warn">⚠️ 0 alertas</span>
+        <button id="btnNotif" class="btn-notif hidden" onclick="toggleNotif()">🔔 Notificações<span id="notifCount" class="count hidden">0</span></button>
+        <div class="user-info">
+          <span id="userName"></span>
+          <button class="btn-sm" onclick="openChangePass()">🔑</button>
+          <button class="btn-sm" style="font-weight:600" onclick="doLogout()">Sair</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Period -->
+  <div class="period-bar">
+    <div style="position:relative">
+      <button class="btn-period" onclick="togglePeriodDD()">
+        <span style="font-size:18px">📅</span>
+        <span id="periodLabel">Efetividade: Mar/2026</span>
+        <span id="periodRange" style="font-size:10px;color:#555;font-weight:400"></span>
+        <span id="periodArrow" style="font-size:10px;margin-left:4px">▼</span>
+      </button>
+      <div id="periodDD" class="dropdown hidden">
+        <div class="dropdown-header">Selecione o período</div>
+        <div id="periodItems"></div>
+      </div>
+    </div>
+    <div id="validateArea"></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div id="filterDept" class="hidden">
+      <label>Departamento:
+        <select id="selDept" onchange="setDeptFilter(this.value)">
+          <option value="all">Todos</option>
+        </select>
+      </label>
+    </div>
+    <div id="filterGestor" class="hidden" style="position:relative">
+      <button class="btn-gestor" onclick="toggleGestorDD()">
+        <span style="font-size:16px">👤</span>
+        <span id="gestorLabel">Todos os Gestores</span>
+        <span id="gestorArrow" style="font-size:10px;margin-left:4px">▼</span>
+      </button>
+      <div id="gestorDD" class="dropdown hidden">
+        <div class="dropdown-header">Selecione o gestor</div>
+        <div id="gestorItems"></div>
+      </div>
+    </div>
+    <div class="tabs" id="tabsArea"></div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend-bar">
+    <span class="legend-item" style="background:var(--green-bg);color:var(--green)">T = Trabalho</span>
+    <span class="legend-item" style="background:var(--blue-bg);color:var(--blue)">DSR = Descanso Semanal</span>
+    <span class="legend-item" style="background:var(--red-bg);color:var(--red)">F = Falta</span>
+  </div>
+
+  <!-- Content -->
+  <div id="viewGrid"></div>
+  <div id="viewAlerts" class="hidden"></div>
+  <div id="viewLogs" class="hidden"></div>
+
+  <!-- Notif Panel -->
+  <div id="notifPanel" class="notif-panel hidden"></div>
+
+  <!-- Modals (generated dynamically) -->
+  <div id="modalArea"></div>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const SB_URL = 'https://vctqdvnwyqozixohmrtw.supabase.co';
+const SB_KEY = 'sb_publishable_BUZVEVxLE4N6pP1lIBcNkQ_yDGzYFpU';
+
+let sbOnline = null; // null=unknown, true/false
+
+async function sbFetch(endpoint, method, body) {
+  // If we already know Supabase is offline, skip immediately for GETs
+  if (sbOnline === false && (!method || method === 'GET')) return null;
+  
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000); // 4s timeout
+  
+  const opts = {
+    method: method || 'GET',
+    signal: controller.signal,
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : (method === 'PATCH' ? 'return=representation' : '')
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/' + endpoint, opts);
+    clearTimeout(timeout);
+    if (!r.ok) { return null; }
+    sbOnline = true;
+    const text = await r.text();
+    return text ? JSON.parse(text) : [];
+  } catch(e) {
+    clearTimeout(timeout);
+    if (sbOnline === null) sbOnline = false;
+    return null;
+  }
+}
+
+// ========== STATE ==========
+let loggedUser = null;
+let currentPeriod = 'mar26';
+let currentView = 'grid';
+let deptFilter = 'all';
+let gestorFilter = 'all';
+
+// Data from DB
+let USERS = [];
+let DEPTS = [];
+let GESTORES = [];
+let FUNCS = [];
+let ESCALAS = {};
+let VALIDACOES = {};
+let LOGS_DATA = [];
+let NOTIFS = [];
+
+const PERIODS = [
+  {id:"mar26",label:"Mar/2026",start:"2026-03-11",end:"2026-04-10"},
+  {id:"apr26",label:"Abr/2026",start:"2026-04-11",end:"2026-05-10"},
+  {id:"may26",label:"Mai/2026",start:"2026-05-11",end:"2026-06-10"},
+  {id:"jun26",label:"Jun/2026",start:"2026-06-11",end:"2026-07-10"},
+  {id:"jul26",label:"Jul/2026",start:"2026-07-11",end:"2026-08-10"},
+  {id:"aug26",label:"Ago/2026",start:"2026-08-11",end:"2026-09-10"},
+  {id:"sep26",label:"Set/2026",start:"2026-09-11",end:"2026-10-10"},
+  {id:"oct26",label:"Out/2026",start:"2026-10-11",end:"2026-11-10"},
+  {id:"nov26",label:"Nov/2026",start:"2026-11-11",end:"2026-12-10"},
+  {id:"dec26",label:"Dez/2026",start:"2026-12-11",end:"2027-01-10"},
+];
+
+const DAYS_L = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+// ========== FALLBACK DATA ==========
+const FALLBACK_USERS = [
+  {usuario:"rh",senha:"rh2026",nome:"Departamento Pessoal",role:"rh",gestor_nome:null},
+  {usuario:"daniel.dacruz@kavak.com",senha:"Brasil10",nome:"DANIEL RODRIGUES DA CRUZ LOPES",role:"gestor",gestor_nome:"DANIEL RODRIGUES DA CRUZ LOPES"},
+  {usuario:"guilherme.pereira@kavak.com",senha:"Brasil10",nome:"GUILHERME THIAGO PEREIRA DE OLIVEIRA",role:"gestor",gestor_nome:"GUILHERME THIAGO PEREIRA DE OLIVEIRA"},
+  {usuario:"junior.nelson@kavak.com",senha:"Brasil10",nome:"NELSON ANDRADE NUNES JUNIOR",role:"gestor",gestor_nome:"NELSON ANDRADE NUNES JUNIOR"},
+  {usuario:"geovanna.teixeira@kavak.com",senha:"Brasil10",nome:"GEOVANNA TEIXEIRA DE CARVALHO NASCIMENTO",role:"gestor",gestor_nome:"GEOVANNA TEIXEIRA DE CARVALHO NASCIMENTO"},
+  {usuario:"bruno.alves@kavak.com",senha:"Brasil10",nome:"BRUNO ALVES TORRES",role:"gestor",gestor_nome:"BRUNO ALVES TORRES"},
+  {usuario:"joao.desiqueira@kavak.com",senha:"Brasil10",nome:"JOAO LUIZ DE SIQUEIRA SANTOS",role:"gestor",gestor_nome:"JOAO LUIZ DE SIQUEIRA SANTOS"},
+  {usuario:"priscilla.dias@kavak.com",senha:"Brasil10",nome:"PRISCILLA CRISTINA DIAS",role:"gestor",gestor_nome:"PRISCILLA CRISTINA DIAS"},
+  {usuario:"luiza.buckup@kavak.com",senha:"Brasil10",nome:"LUIZA CORREA BUCKUP",role:"gestor",gestor_nome:"LUIZA CORREA BUCKUP"},
+  {usuario:"daniel.brito@kavak.com",senha:"Brasil10",nome:"DANIEL SOARES BRITO MOURA",role:"gestor",gestor_nome:"DANIEL SOARES BRITO MOURA"},
+  {usuario:"monica.augusto@kavak.com",senha:"Brasil10",nome:"MONICA DE SOUZA AUGUSTO",role:"gestor",gestor_nome:"MONICA DE SOUZA AUGUSTO"},
+  {usuario:"guilherme.defreitas@kavak.com",senha:"Brasil10",nome:"GUILHERME DE FREITAS SANTOS",role:"gestor",gestor_nome:"GUILHERME DE FREITAS SANTOS"},
+];
+
+const FALLBACK_DEPTS = [
+  {id:1,nome:"Logistics Operations"},
+  {id:2,nome:"Logistica Externa SP"},
+  {id:3,nome:"Customer University - Hubs"},
+  {id:4,nome:"Customer Sucess - Sales Ops"},
+  {id:5,nome:"Customer Sucess - Sales Experience"},
+  {id:6,nome:"Performance - Supply Exp"},
+  {id:7,nome:"Inspection"},
+  {id:8,nome:"Vehicular Research"},
+  {id:9,nome:"Kavak Capital - Operations"},
+];
+
+const FALLBACK_GESTORES = [
+  {id:1,nome:"DANIEL RODRIGUES DA CRUZ LOPES",departamento_id:1},
+  {id:2,nome:"GUILHERME THIAGO PEREIRA DE OLIVEIRA",departamento_id:3},
+  {id:3,nome:"NELSON ANDRADE NUNES JUNIOR",departamento_id:3},
+  {id:4,nome:"GEOVANNA TEIXEIRA DE CARVALHO NASCIMENTO",departamento_id:3},
+  {id:5,nome:"BRUNO ALVES TORRES",departamento_id:7},
+  {id:6,nome:"JOAO LUIZ DE SIQUEIRA SANTOS",departamento_id:5},
+  {id:7,nome:"PRISCILLA CRISTINA DIAS",departamento_id:8},
+  {id:8,nome:"LUIZA CORREA BUCKUP",departamento_id:9},
+  {id:9,nome:"DANIEL SOARES BRITO MOURA",departamento_id:6},
+  {id:10,nome:"MONICA DE SOUZA AUGUSTO",departamento_id:6},
+  {id:11,nome:"GUILHERME DE FREITAS SANTOS",departamento_id:5},
+];
+
+const FALLBACK_FUNCS = [
+  {id:1,matricula:"2405",nome:"CESAR AUGUSTO ALVES DE CARVALHO SILVA",funcao:"ANALISTA DE PLANEJ LOGISTICO JR",gestor_id:1},
+  {id:2,matricula:"4298",nome:"NATALIA SENA DE SOUZA",funcao:"ASSISTENTE DE LOGISTICA",gestor_id:1},
+  {id:3,matricula:"2208",nome:"ANDRE MONTEIRO NUNES",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:4,matricula:"3995",nome:"DENNER FELIPE QUEIROZ MAGALHAES",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:5,matricula:"4286",nome:"DIEGO DE OLIVEIRA QUISSI QUEIROZ",funcao:"ASSISTENTE ADM BACKOFFICE COMERCIAL",gestor_id:2},
+  {id:6,matricula:"4033",nome:"EMILY DA SILVA",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:7,matricula:"4287",nome:"GABRIEL CARVALHO CASTELANO",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:8,matricula:"4039",nome:"LETICIA PORTELINHA PARO",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:9,matricula:"3911",nome:"MARTA MARIA CAVALCANTE CARNEIRO",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:10,matricula:"4318",nome:"RAFAEL HENRIQUE ANDRADE DE SOUSA",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:11,matricula:"4281",nome:"TALITA KATHLEEN ALVES",funcao:"RECEPCIONISTA DE LOJA",gestor_id:2},
+  {id:12,matricula:"1131",nome:"TATIANE VERONICA",funcao:"ENCARREGADO SUPORTE AO CLIENTE",gestor_id:2},
+  {id:13,matricula:"4348",nome:"GUILHERME DUTRA DE ARAUJO",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:14,matricula:"4340",nome:"JOSE RAFAEL TAVEIRA DE SOUZA",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:15,matricula:"4388",nome:"ROBSON SILVA LOPES",funcao:"CONSULTOR COMERCIAL",gestor_id:2},
+  {id:16,matricula:"4387",nome:"SARA MARIA DA SILVA SANTOS",funcao:"RECEPCIONISTA DE LOJA",gestor_id:2},
+  {id:17,matricula:"4268",nome:"JOSE ROBERTO FERREIRA DOS SANTOS",funcao:"CONSULTOR COMERCIAL",gestor_id:3},
+  {id:18,matricula:"4314",nome:"JULIANA GOMES MONSALVO",funcao:"CONSULTOR COMERCIAL",gestor_id:4},
+  {id:19,matricula:"4336",nome:"PRISCILA RODRIGUES DO PRADO SILVESTRE",funcao:"CONSULTOR COMERCIAL",gestor_id:4},
+  {id:20,matricula:"4328",nome:"MICHELLE NERI DE ALMEIDA",funcao:"CONSULTOR COMERCIAL",gestor_id:4},
+  {id:21,matricula:"4375",nome:"ANTONIO DE JESUS DORIA FILHO",funcao:"CONSULTOR COMERCIAL",gestor_id:4},
+  {id:22,matricula:"1540",nome:"LUCAS PAULO GONCALVES DA SILVA",funcao:"INSPETOR",gestor_id:5},
+  {id:23,matricula:"2066",nome:"JOSE ROBERTO DOS PASSOS SILVA",funcao:"INSPETOR",gestor_id:5},
+  {id:24,matricula:"3841",nome:"BRUNO DOMINGUES DE ALMEIDA",funcao:"INSPETOR",gestor_id:5},
+  {id:25,matricula:"3845",nome:"DANILO LINDEMBERG MONTEIRO",funcao:"INSPETOR",gestor_id:5},
+  {id:26,matricula:"3967",nome:"RODRIGO LUIZ DA SILVA",funcao:"INSPETOR",gestor_id:5},
+  {id:27,matricula:"4002",nome:"JOAO PAULO RODRIGUES DA SILVA",funcao:"INSPETOR",gestor_id:5},
+  {id:28,matricula:"4146",nome:"LUCAS QUEIROZ",funcao:"INSPETOR",gestor_id:5},
+  {id:29,matricula:"3911",nome:"EDSON STEVANATO JUNIOR",funcao:"INSPETOR",gestor_id:5},
+  {id:30,matricula:"4197",nome:"VAGNER MORAIS DA SILVA",funcao:"INSPETOR",gestor_id:5},
+  {id:31,matricula:"4272",nome:"DANIEL ALEX PADUN",funcao:"INSPETOR",gestor_id:5},
+  {id:32,matricula:"4243",nome:"GERSON ALVES DA SILVA",funcao:"INSPETOR",gestor_id:5},
+  {id:33,matricula:"4332",nome:"IRONILDO JOSE DA SILVA",funcao:"INSPETOR",gestor_id:5},
+  {id:34,matricula:"1400",nome:"BRUNO LIMA DOS SANTOS",funcao:"ANALISTA DE INSPECAO JR",gestor_id:5},
+  {id:35,matricula:"4352",nome:"FERNANDO EDUARDO DE CARVALHO",funcao:"INSPETOR",gestor_id:5},
+  {id:36,matricula:"4386",nome:"JOAO VICTOR TELES",funcao:"INSPETOR",gestor_id:5},
+  {id:37,matricula:"3910",nome:"JOAO SEVERINO DE SANTANA",funcao:"CONSULTOR COMERCIAL",gestor_id:3},
+  {id:38,matricula:"4015",nome:"CLAUDIO JOSE ALVES PAES",funcao:"CONSULTOR COMERCIAL",gestor_id:3},
+  {id:39,matricula:"4129",nome:"VINICIUS CARMINHOTO DOS SANTOS",funcao:"CONSULTOR COMERCIAL",gestor_id:3},
+  {id:40,matricula:"4268",nome:"JOSE ROBERTO FERREIRA DOS SANTOS",funcao:"CONSULTOR COMERCIAL",gestor_id:3},
+  {id:41,matricula:"4364",nome:"ANDERSON ALVES FILIPO DA CRUZ",funcao:"CONSULTOR COMERCIAL",gestor_id:3},
+  {id:42,matricula:"4373",nome:"ERICA VICENTE VENANCIO",funcao:"ANALISTA EXPERIENCE",gestor_id:3},
+  {id:43,matricula:"3886",nome:"AUGUSTO GOMES DE MATTOS SOUSA",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:44,matricula:"4224",nome:"BIANCA BASILIO DA SILVA",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:45,matricula:"4046",nome:"BRENO SANTOS DE SOUZA",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:46,matricula:"4053",nome:"CAIO NOGUEIRA BATISTA",funcao:"AGENTE BACKOFFICE DE VENDAS",gestor_id:6},
+  {id:47,matricula:"3969",nome:"EMMERSON ROCHA",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:48,matricula:"4231",nome:"GEAN AMORIM JARDIM",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:49,matricula:"4294",nome:"LUIZ CARLOS AZEVEDO ARAUJO",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:50,matricula:"3847",nome:"MICHAEL VINICIUS DOS SANTOS",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:51,matricula:"4125",nome:"PEDRO HENRIQUE SANTOS ROSSETTO",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:52,matricula:"4213",nome:"TAMILLIS SILVA BISPO",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:53,matricula:"3838",nome:"THAIS CLAUDINEIA DOS SANTOS MENESES",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:54,matricula:"4087",nome:"VINICIUS ALVES DA SILVA",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:55,matricula:"4370",nome:"IRIS CRISTINA DA ROCHA",funcao:"ANALISTA EXPERIENCE",gestor_id:6},
+  {id:56,matricula:"4130",nome:"BRENDA NUNES DE ANDRADE",funcao:"CONSULTOR COMERCIAL",gestor_id:6},
+  {id:57,matricula:"860",nome:"PALOMA DE CARVALHO RIBEIRO",funcao:"CONSULTOR COMERCIAL",gestor_id:6},
+  {id:58,matricula:"4225",nome:"JEAN ATAIDE PINTO",funcao:"ASSISTENTE ADMINISTRATIVO",gestor_id:7},
+  {id:59,matricula:"4232",nome:"ISAAC FERNANDES VIANA",funcao:"ASSISTENTE ADMINISTRATIVO",gestor_id:7},
+  {id:60,matricula:"4180",nome:"SANTINO AZEVEDO CASTRO",funcao:"ANALISTA DE FINANCIAMENTO JR",gestor_id:8},
+  {id:61,matricula:"4234",nome:"VINICIUS NUNES LARANJEIRA",funcao:"ANALISTA DE FINANCIAMENTO JR",gestor_id:8},
+  {id:62,matricula:"4358",nome:"LUIS MIRAMAR MAGALHAES",funcao:"ANALISTA DE FINANCIAMENTO JR",gestor_id:8},
+  {id:63,matricula:"4359",nome:"JOAO RICARDO DE OLIVEIRA",funcao:"ANALISTA DE FINANCIAMENTO JR",gestor_id:8},
+  {id:64,matricula:"528",nome:"HEMELYN AMORIM ROCHA",funcao:"CONSULTOR COMERCIAL",gestor_id:9},
+  {id:65,matricula:"3534",nome:"THAIS HENRIQUETA BARBOSA",funcao:"CONSULTOR COMERCIAL",gestor_id:9},
+  {id:66,matricula:"3999",nome:"BEATRIZ SILVA CARDOSO LEITE",funcao:"CONSULTOR COMERCIAL",gestor_id:6},
+  {id:67,matricula:"4088",nome:"RAFAEL ALVES MACHADO",funcao:"CONSULTOR COMERCIAL",gestor_id:9},
+  {id:68,matricula:"4186",nome:"VINICIUS MENESES DA SILVA",funcao:"CONSULTOR COMERCIAL",gestor_id:9},
+  {id:69,matricula:"4278",nome:"ERICA RIBEIRO DE SOUSA MENDES DA SILVA",funcao:"CONSULTOR COMERCIAL",gestor_id:9},
+  {id:70,matricula:"4290",nome:"BRUNO LEANDRO SANTOS SILVA",funcao:"CONSULTOR COMERCIAL",gestor_id:9},
+  {id:71,matricula:"4380",nome:"ANDREIA MORAES AMORIM SANTANA",funcao:"CONSULTOR COMERCIAL",gestor_id:9},
+  {id:72,matricula:"4323",nome:"CAIO HENRIQUE ALVES DE ALMEIDA",funcao:"CONSULTOR COMERCIAL",gestor_id:10},
+  {id:73,matricula:"4220",nome:"FERNANDA AGUIAR NERES",funcao:"CONSULTOR COMERCIAL",gestor_id:10},
+  {id:74,matricula:"3990",nome:"PAMELA DE CARVALHO RIBEIRO",funcao:"CONSULTOR COMERCIAL",gestor_id:10},
+  {id:75,matricula:"4124",nome:"VINICIUS DA MARIO TILIAQUE",funcao:"CONSULTOR COMERCIAL",gestor_id:10},
+  {id:76,matricula:"4382",nome:"ADRIANA PIA DA COSTA GAMA",funcao:"CONSULTOR COMERCIAL",gestor_id:10},
+  {id:77,matricula:"4376",nome:"MOACIR FERNANDO CANGUSSU COUTINHO",funcao:"CONSULTOR COMERCIAL",gestor_id:10},
+  {id:78,matricula:"4384",nome:"JOEL DA SILVA PAIVA",funcao:"CONSULTOR COMERCIAL",gestor_id:10},
+  {id:79,matricula:"4288",nome:"CAIO MILIOTTI CARAFIZI RAMOS",funcao:"ANALISTA EXPERIENCE",gestor_id:11},
+  {id:80,matricula:"3953",nome:"ALLAN DE SOUZA SANTOS",funcao:"ANALISTA EXPERIENCE",gestor_id:11},
+  {id:81,matricula:"605",nome:"MARIA JULIA NOGUEIRA",funcao:"ANALISTA EXPERIENCE",gestor_id:11},
+  {id:82,matricula:"4251",nome:"MAURIELLO RAFAEL BARRIOS MARSIGLIA",funcao:"ANALISTA EXPERIENCE",gestor_id:11},
+  {id:83,matricula:"4166",nome:"KELLY ABREU DA SILVA",funcao:"CONSULTOR COMERCIAL",gestor_id:11},
+  {id:84,matricula:"4374",nome:"GABRIEL ANTONIO REIS MOREIRA PINTO",funcao:"CONSULTOR COMERCIAL",gestor_id:11},
+  {id:85,matricula:"4377",nome:"LEONARDO COSTA DE LIMA",funcao:"ANALISTA EXPERIENCE",gestor_id:11},
+];
+
+// ========== LOAD DATA ==========
+async function loadData() {
+  // Test connection with a single fast query
+  const testUsers = await sbFetch('usuarios?select=*');
+  
+  if (testUsers && testUsers.length > 0) {
+    // Supabase is online - load all data
+    USERS = testUsers.map(u => ({
+      usuario: u.usuario,
+      senha: u.senha,
+      nome: u.nome,
+      role: u.role || u.perfil || 'gestor',
+      gestor_nome: u.gestor_nome || u.gestor || u.nome
+    }));
+
+    let depts = await sbFetch('departamentos?select=*');
+    DEPTS = (depts && depts.length > 0) ? depts : FALLBACK_DEPTS;
+
+    let gestores = await sbFetch('gestores?select=*');
+    GESTORES = (gestores && gestores.length > 0) ? gestores : FALLBACK_GESTORES;
+
+    let funcs = await sbFetch('funcionarios?select=*');
+    FUNCS = (funcs && funcs.length > 0) ? funcs : FALLBACK_FUNCS;
+
+    let escalas = await sbFetch('escalas?select=*');
+    if (escalas && escalas.length > 0) {
+      escalas.forEach(e => {
+        ESCALAS[e.periodo + '_' + e.funcionario_id] = e.valores ? (typeof e.valores === 'string' ? JSON.parse(e.valores) : e.valores) : [];
+      });
+    }
+
+    let vals = await sbFetch('validacoes?select=*');
+    if (vals && vals.length > 0) {
+      vals.forEach(v => {
+        VALIDACOES[v.periodo + '_' + v.gestor_nome] = { ts: v.data_hora, gestor: v.gestor_nome, periodo: v.periodo };
+      });
+    }
+
+    let logs = await sbFetch('logs?select=*&order=created_at.desc&limit=500');
+    if (logs && logs.length > 0) LOGS_DATA = logs;
+
+    let notifs = await sbFetch('notificacoes?select=*&order=created_at.desc&limit=100');
+    if (notifs && notifs.length > 0) NOTIFS = notifs;
+
+    console.log('✅ Dados carregados do Supabase');
+  } else {
+    // Supabase offline - use fallback data instantly
+    USERS = FALLBACK_USERS.map(u => ({...u}));
+    DEPTS = FALLBACK_DEPTS.map(d => ({...d}));
+    GESTORES = FALLBACK_GESTORES.map(g => ({...g}));
+    FUNCS = FALLBACK_FUNCS.map(f => ({...f}));
+    console.log('⚠️ Supabase offline — usando dados locais');
+  }
+}
+
+// ========== DATE HELPERS ==========
+function genDates(start, end) {
+  const d = [], s = new Date(start+'T12:00:00'), e = new Date(end+'T12:00:00');
+  for (let c = new Date(s); c <= e; c.setDate(c.getDate()+1)) d.push(new Date(c));
+  return d;
+}
+function fmt(d) { return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+function fmtFull(d) { return fmt(d)+'/'+d.getFullYear(); }
+function nowStr() { const d=new Date(); return fmtFull(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0'); }
+
+// ========== VALIDATION ==========
+function validate(sch, dates) {
+  const a = [], n = dates.length;
+  
+  // REGRA 1: Máximo 6 dias consecutivos sem DSR (7+ = erro crítico)
+  let con = 0, si = -1;
+  for (let i = 0; i < n; i++) {
+    const v = sch[i];
+    if (v === 'T') {
+      if (!con) si = i;
+      con++;
+      if (con > 6) a.push({type:'critical', msg: con+' dias consecutivos sem DSR ('+fmt(dates[si])+' a '+fmt(dates[i])+')', days: Array.from({length:con},(_,k)=>si+k)});
+    } else if (v === 'DSR' || v === 'F') con = 0;
+  }
+  
+  // Coletar domingos do período
+  const suns = [];
+  for (let i = 0; i < n; i++) if (dates[i].getDay() === 0) suns.push(i);
+  
+  // REGRA 2: Domingo 2x1 — máx 2 domingos trabalhados seguidos, 3º deve ser DSR
+  let ws = 0;
+  for (let s = 0; s < suns.length; s++) {
+    const idx = suns[s], v = sch[idx];
+    if (v === 'T') { ws++; if (ws >= 3) a.push({type:'critical', msg:'3 domingos consecutivos trabalhados (regra 2x1). '+fmt(dates[idx])+' DEVE ser DSR', days:[idx]}); }
+    else if (v === 'DSR') ws = 0;
+  }
+  
+  // REGRA 3: Pelo menos 1 domingo de folga no mês
+  if (suns.length > 0) {
+    const sunsFilled = suns.filter(i => sch[i] === 'T' || sch[i] === 'DSR' || sch[i] === 'F');
+    if (sunsFilled.length > 0) {
+      const sunsDSR = suns.filter(i => sch[i] === 'DSR');
+      if (sunsDSR.length === 0) {
+        a.push({type:'critical', msg:'Nenhum domingo com DSR no período. É obrigatório pelo menos 1 domingo de folga por mês', days: suns});
+      }
+    }
+  }
+  
+  // REGRA 4: Semana sem DSR programado (warning)
+  for (let w = 0; w < Math.floor(n/7); w++) {
+    const ws2 = w*7, we = Math.min(ws2+7, n);
+    let has = false, filled = 0;
+    for (let i = ws2; i < we; i++) { if (sch[i]==='DSR') has=true; if (sch[i]) filled++; }
+    if (!has && filled >= 6) a.push({type:'warning', msg:'Semana '+fmt(dates[ws2])+' a '+fmt(dates[Math.min(we-1,n-1)])+' sem DSR programado', days: Array.from({length:we-ws2},(_,k)=>ws2+k)});
+  }
+  
+  return a;
+}
+
+// ========== UI HELPERS ==========
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + (type||'info');
+  setTimeout(() => { t.className = 'toast hidden'; }, 4000);
+}
+
+function closeAllDD() {
+  document.getElementById('periodDD').classList.add('hidden');
+  document.getElementById('gestorDD').classList.add('hidden');
+}
+
+// ========== LOGIN ==========
+function doLogin() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const found = USERS.find(u => u.usuario === user && u.senha === pass);
+  if (found) {
+    loggedUser = found;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('loginError').classList.add('hidden');
+    renderApp();
+  } else {
+    document.getElementById('loginError').textContent = 'Usuário ou senha inválidos';
+    document.getElementById('loginError').classList.remove('hidden');
+  }
+}
+
+function doLogout() {
+  loggedUser = null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+
+// Key listeners for login
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !loggedUser) doLogin();
+});
+
+// ========== RENDER ==========
+function getFilteredFuncs() {
+  const isRH = loggedUser.role === 'rh';
+  const result = [];
+  DEPTS.forEach(dept => {
+    const deptGestores = GESTORES.filter(g => g.departamento_id === dept.id);
+    deptGestores.forEach(g => {
+      if (!isRH && g.nome !== loggedUser.gestor_nome) return;
+      if (deptFilter !== 'all' && dept.id !== parseInt(deptFilter)) return;
+      if (isRH && gestorFilter !== 'all' && g.nome !== gestorFilter) return;
+      const gFuncs = FUNCS.filter(f => f.gestor_id === g.id);
+      gFuncs.forEach(f => {
+        result.push({
+          id: f.id,
+          matricula: f.matricula || '',
+          nome: f.nome,
+          funcao: f.funcao || '',
+          dept_nome: dept.nome,
+          gestor_nome: g.nome,
+          gestor_id: g.id
+        });
+      });
+    });
+  });
+  return result;
+}
+
+function renderApp() {
+  if (!loggedUser) return;
+  const isRH = loggedUser.role === 'rh';
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const numDays = dates.length;
+  const funcs = getFilteredFuncs();
+
+  // Header
+  document.getElementById('userName').textContent = (isRH ? '🛡️ ' : '👤 ') + loggedUser.nome;
+  document.getElementById('btnNotif').classList.toggle('hidden', !isRH);
+
+  // Period label
+  document.getElementById('periodLabel').textContent = 'Efetividade: ' + per.label;
+  document.getElementById('periodRange').textContent = '(' + per.start.slice(8)+'/'+per.start.slice(5,7)+' a '+per.end.slice(8)+'/'+per.end.slice(5,7) + ')';
+
+  // Period dropdown
+  let phtml = '';
+  PERIODS.forEach(p => {
+    const active = p.id === currentPeriod;
+    phtml += `<button class="dropdown-item ${active?'active':''}" onclick="setPeriod('${p.id}')">
+      <span style="font-size:16px">${active?'📅':'🗓️'}</span>
+      <div><div style="font-weight:${active?700:500};font-size:13px;color:${active?'var(--navy)':'var(--text)'}">${p.label}</div>
+      <div style="font-size:10px;color:#888">${p.start.slice(8)+'/'+p.start.slice(5,7)} a ${p.end.slice(8)+'/'+p.end.slice(5,7)}</div></div>
+      ${active?'<span style="margin-left:auto;color:var(--navy);font-weight:700">✓</span>':''}
+    </button>`;
+  });
+  document.getElementById('periodItems').innerHTML = phtml;
+
+  // Validate area
+  const vKey = currentPeriod + '_' + loggedUser.gestor_nome;
+  const curVal = VALIDACOES[vKey];
+  // Compute alerts first
+  const allAlerts = {};
+  funcs.forEach(f => {
+    const key = currentPeriod + '_' + f.id;
+    const sch = ESCALAS[key] || Array(numDays).fill('');
+    allAlerts[f.id] = validate(sch, dates);
+  });
+  let totalCrit = 0, totalWarn = 0;
+  for (const k in allAlerts) allAlerts[k].forEach(a => { if(a.type==='critical') totalCrit++; else totalWarn++; });
+
+  // Badges
+  const bc = document.getElementById('badgeCrit');
+  bc.textContent = '⛔ ' + totalCrit + ' críticos';
+  bc.className = 'badge badge-crit' + (totalCrit === 0 ? ' ok' : '');
+  const bw = document.getElementById('badgeWarn');
+  bw.textContent = '⚠️ ' + totalWarn + ' alertas';
+  bw.className = 'badge badge-warn' + (totalWarn === 0 ? ' ok' : '');
+
+  // Validate button
+  if (!isRH) {
+    if (curVal) {
+      document.getElementById('validateArea').innerHTML = `<span class="validated-badge">✅ Validado em ${curVal.ts}</span>`;
+    } else {
+      const disabled = totalCrit > 0;
+      document.getElementById('validateArea').innerHTML = `<button class="btn-validate" style="background:${disabled?'#9e9e9e':'var(--green)'};cursor:${disabled?'not-allowed':'pointer'}" onclick="doValidate()">✅ Validar Escala</button>`;
+    }
+  } else {
+    document.getElementById('validateArea').innerHTML = '';
+  }
+
+  // Filters
+  if (isRH) {
+    document.getElementById('filterDept').classList.remove('hidden');
+    document.getElementById('filterGestor').classList.remove('hidden');
+    // Dept options
+    let dopts = '<option value="all">Todos</option>';
+    DEPTS.forEach(d => { dopts += `<option value="${d.id}" ${deptFilter==d.id?'selected':''}>${d.nome}</option>`; });
+    document.getElementById('selDept').innerHTML = dopts;
+    // Gestor dropdown
+    document.getElementById('gestorLabel').textContent = gestorFilter === 'all' ? 'Todos os Gestores' : gestorFilter;
+    let ghtml = `<button class="dropdown-item ${gestorFilter==='all'?'active':''}" onclick="setGestorFilterVal('all')">
+      <span style="font-size:14px">👥</span><div style="font-weight:${gestorFilter==='all'?700:500};font-size:13px">Todos os Gestores</div>
+      ${gestorFilter==='all'?'<span style="margin-left:auto;color:var(--navy);font-weight:700">✓</span>':''}
+    </button>`;
+    const allG = [];
+    GESTORES.forEach(g => { if (allG.indexOf(g.nome) < 0) allG.push(g.nome); });
+    allG.forEach(g => {
+      ghtml += `<button class="dropdown-item ${gestorFilter===g?'active':''}" onclick="setGestorFilterVal('${g.replace(/'/g,"\\'")}')">
+        <span style="font-size:14px">👤</span><div style="font-weight:${gestorFilter===g?700:500};font-size:13px">${g}</div>
+        ${gestorFilter===g?'<span style="margin-left:auto;color:var(--navy);font-weight:700">✓</span>':''}
+      </button>`;
+    });
+    document.getElementById('gestorItems').innerHTML = ghtml;
+  } else {
+    document.getElementById('filterDept').classList.add('hidden');
+    document.getElementById('filterGestor').classList.add('hidden');
+  }
+
+  // Tabs
+  let tabs = `
+    <button class="tab-btn" style="background:${currentView==='grid'?'var(--navy)':'#e0e0e0'};color:${currentView==='grid'?'#fff':'#333'}" onclick="setView('grid')">📋 Grade</button>
+    <button class="tab-btn" style="background:${currentView==='alerts'?'var(--red)':'#e0e0e0'};color:${currentView==='alerts'?'#fff':'#333'}" onclick="setView('alerts')">📊 Alertas</button>`;
+  if (isRH) {
+    tabs += `<button class="tab-btn" style="background:${currentView==='logs'?'var(--orange)':'#e0e0e0'};color:${currentView==='logs'?'#fff':'#333'}" onclick="setView('logs')">📝 Auditoria</button>`;
+    tabs += `<button class="tab-btn" style="background:var(--green);color:#fff" onclick="openImport()">📥 Importar</button>`;
+    tabs += `<button class="tab-btn" style="background:var(--purple);color:#fff" onclick="openAddGestor()">👤+ Gestor</button>`;
+    tabs += `<button class="tab-btn" style="background:var(--teal);color:#fff" onclick="openAddFunc()">👥+ Func</button>`;
+  }
+  document.getElementById('tabsArea').innerHTML = tabs;
+
+  // Notif count
+  const unread = NOTIFS.filter(n => !n.lida).length;
+  const nc = document.getElementById('notifCount');
+  if (unread > 0) { nc.textContent = unread; nc.classList.remove('hidden'); }
+  else nc.classList.add('hidden');
+
+  // Views
+  document.getElementById('viewGrid').classList.toggle('hidden', currentView !== 'grid');
+  document.getElementById('viewAlerts').classList.toggle('hidden', currentView !== 'alerts');
+  document.getElementById('viewLogs').classList.toggle('hidden', currentView !== 'logs');
+
+  if (currentView === 'grid') renderGrid(funcs, dates, allAlerts);
+  else if (currentView === 'alerts') renderAlerts(funcs, dates, allAlerts);
+  else if (currentView === 'logs') renderLogs();
+}
+
+function renderGrid(funcs, dates, allAlerts) {
+  const numDays = dates.length;
+  const isRH = loggedUser.role === 'rh';
+
+  // Error days map
+  const errDays = {};
+  funcs.forEach(f => {
+    const s = {};
+    (allAlerts[f.id]||[]).forEach(a => a.days.forEach(d => { s[d] = true; }));
+    errDays[f.id] = s;
+  });
+
+  let html = '<div class="grid-wrap"><div class="grid-scroll"><table class="grid-table"><thead><tr>';
+  html += '<th class="sticky" style="left:0;min-width:32px;text-align:center">N</th>';
+  html += '<th class="sticky" style="left:32px;min-width:50px">Mat.</th>';
+  html += '<th class="sticky" style="left:82px;min-width:170px;text-align:left">Nome</th>';
+  html += '<th style="min-width:90px">Função</th>';
+  html += '<th style="min-width:28px">⚙️</th>';
+  dates.forEach((d,i) => {
+    const isSun = d.getDay() === 0;
+    html += `<th style="min-width:54px;text-align:center;${isSun?'background:var(--navy)':''}"><div style="font-size:9px;opacity:.8">${DAYS_L[d.getDay()]}</div><div style="font-size:10px;font-weight:700">${fmt(d)}</div></th>`;
+  });
+  html += '<th style="min-width:60px">Status</th></tr></thead><tbody>';
+
+  let lastGestor = '', nn = 0;
+  funcs.forEach(f => {
+    if (f.gestor_nome !== lastGestor) {
+      lastGestor = f.gestor_nome;
+      nn = 0;
+      html += `<tr class="dept-row"><td colspan="${5+numDays+1}">📂 ${f.dept_nome} — 👤 ${f.gestor_nome}</td></tr>`;
+    }
+    nn++;
+    const key = currentPeriod + '_' + f.id;
+    const sch = ESCALAS[key] || Array(numDays).fill('');
+    const errs = errDays[f.id] || {};
+    const als = allAlerts[f.id] || [];
+    const crit = als.filter(a => a.type === 'critical').length;
+    const bg = nn % 2 === 0 ? 'var(--white)' : '#f8f9fc';
+
+    html += `<tr style="background:${bg}">`;
+    html += `<td class="sticky" style="left:0;background:${bg};text-align:center;font-weight:600">${nn}</td>`;
+    html += `<td class="sticky" style="left:32px;background:${bg};font-size:10px">${f.matricula}</td>`;
+    html += `<td class="sticky" style="left:82px;background:${bg};font-weight:600;font-size:10px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.nome}">${f.nome}</td>`;
+    html += `<td style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#555">${f.funcao}</td>`;
+    html += `<td style="text-align:center"><button class="btn-6x1" onclick="autoFill(${f.id})">6x1</button></td>`;
+
+    dates.forEach((d, i) => {
+      const isSun = d.getDay() === 0;
+      const val = sch[i] || '';
+      const hasErr = !!errs[i];
+      const cls = val ? 'cell-'+val : 'cell-empty';
+      html += `<td style="text-align:center;${isSun?'background:#e8eaf6':''}">
+        <div class="cell ${cls} ${hasErr?'err':''}" onclick="openCellEdit(this,${f.id},${i},'${f.nome.replace(/'/g,"\\'")}')" id="cell_${f.id}_${i}">${val || '—'}</div>
+      </td>`;
+    });
+
+    // Status
+    let statusHtml = '';
+    if (crit > 0) statusHtml = `<button class="status-btn status-crit" onclick="showEmpAlerts(${f.id})">⛔ ${crit}</button>`;
+    else if (als.length > 0) statusHtml = `<button class="status-btn status-warn" onclick="showEmpAlerts(${f.id})">⚠️ ${als.length}</button>`;
+    else statusHtml = '<span class="status-ok">✅</span>';
+
+    if (isRH) {
+      statusHtml = `<div style="display:flex;gap:3px;align-items:center;justify-content:center">${statusHtml}
+        <button class="btn-icon" onclick="openTransfer(${f.id},'${f.nome.replace(/'/g,"\\'")}')" title="Transferir">🔄</button>
+        <button class="btn-icon" onclick="removeFunc(${f.id},'${f.nome.replace(/'/g,"\\'")}')" title="Excluir">🗑️</button>
+      </div>`;
+    }
+    html += `<td style="text-align:center">${statusHtml}</td></tr>`;
+  });
+
+  html += '</tbody></table></div></div>';
+  document.getElementById('viewGrid').innerHTML = html;
+}
+
+function renderAlerts(funcs, dates, allAlerts) {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  let html = `<div class="alerts-wrap"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:18px;color:var(--navy)">📊 Alertas — ${per.label}</h2></div>`;
+  let hasAlerts = false;
+  funcs.forEach(f => {
+    const als = allAlerts[f.id] || [];
+    if (!als.length) return;
+    hasAlerts = true;
+    html += `<div class="alert-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div><span style="font-weight:700;font-size:13px">${f.nome}</span><span style="margin-left:8px;font-size:11px;color:#666">Mat: ${f.matricula}</span></div>
+        <span style="font-size:11px;color:#666">${f.funcao}</span>
+      </div>`;
+    als.forEach(al => {
+      html += `<div class="alert-item ${al.type}">
+        <span style="font-size:13px">${al.type==='critical'?'⛔':'⚠️'}</span>
+        <div><div style="font-size:12px;font-weight:600;color:${al.type==='critical'?'var(--red)':'var(--orange)'}">${al.type==='critical'?'ERRO CRÍTICO':'ALERTA'}</div>
+        <div style="font-size:11px;color:var(--text);margin-top:1px">${al.msg}</div></div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  if (!hasAlerts) {
+    html += '<div style="text-align:center;padding:40px;color:#666"><div style="font-size:40px;margin-bottom:8px">✅</div><div style="font-size:15px">Nenhum alerta. Escalas OK!</div></div>';
+  }
+  html += '</div>';
+  document.getElementById('viewAlerts').innerHTML = html;
+}
+
+function renderLogs() {
+  const isRH = loggedUser.role === 'rh';
+  const fl = isRH ? LOGS_DATA : LOGS_DATA.filter(l => l.usuario === loggedUser.nome);
+  let html = `<div class="logs-wrap"><h2 style="font-size:18px;color:var(--navy);margin-bottom:16px">📝 Log de Auditoria</h2>`;
+  if (!fl.length) {
+    html += '<div style="text-align:center;padding:40px;color:#888">Nenhum registro.</div>';
+  } else {
+    html += '<table class="logs-table"><thead><tr><th>Data/Hora</th><th>Usuário</th><th>Ação</th><th>Funcionário</th><th>Dia</th><th>De → Para</th><th>Pós-Valid.</th></tr></thead><tbody>';
+    fl.slice(0,200).forEach((l,i) => {
+      const ts = l.created_at ? new Date(l.created_at).toLocaleString('pt-BR') : (l.data_hora || '');
+      html += `<tr class="${l.pos_validacao?'post-val':''}">
+        <td style="font-size:11px">${ts}</td>
+        <td style="font-weight:600">${l.usuario||''}</td>
+        <td>${l.acao||''}</td>
+        <td>${l.funcionario_nome||l.func||''}</td>
+        <td style="text-align:center">${l.dia||l.data||''}</td>
+        <td style="text-align:center;font-weight:600">${(l.valor_anterior||l.de||'')} → ${(l.valor_novo||l.para||'')}</td>
+        <td style="text-align:center">${l.pos_validacao?'<span style="background:var(--red);color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">SIM</span>':'<span style="color:#999;font-size:10px">—</span>'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+  document.getElementById('viewLogs').innerHTML = html;
+}
+
+// ========== CELL EDITING ==========
+let editingCell = null; // {funcId, dayIdx, funcName}
+
+function openCellEdit(el, funcId, dayIdx, funcName) {
+  // If already editing this cell, ignore
+  if (editingCell && editingCell.funcId === funcId && editingCell.dayIdx === dayIdx) return;
+  
+  editingCell = {funcId, dayIdx, funcName};
+  
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const key = currentPeriod + '_' + funcId;
+  const sch = ESCALAS[key] || Array(dates.length).fill('');
+  const curVal = sch[dayIdx] || '';
+
+  // Show a modal-style picker instead of inline select
+  const rect = el.getBoundingClientRect();
+  let picker = document.getElementById('cellPicker');
+  if (!picker) {
+    picker = document.createElement('div');
+    picker.id = 'cellPicker';
+    document.body.appendChild(picker);
+  }
+  
+  const options = [
+    {val:'', label:'Limpar', bg:'#f5f5f5', color:'#999'},
+    {val:'T', label:'Trabalho', bg:'var(--green-bg)', color:'var(--green)'},
+    {val:'DSR', label:'Descanso', bg:'var(--blue-bg)', color:'var(--blue)'},
+    {val:'F', label:'Falta', bg:'var(--red-bg)', color:'var(--red)'}
+  ];
+  
+  let optHtml = '';
+  options.forEach(o => {
+    const selected = curVal === o.val || (!curVal && o.val === '');
+    optHtml += `<button onclick="pickCellValue('${o.val}',${funcId},${dayIdx},'${funcName.replace(/'/g,"\\'")}')" 
+      style="display:flex;align-items:center;gap:6px;width:100%;padding:6px 10px;border:none;
+      border-bottom:1px solid #f0f0f0;background:${selected?'#e8eaf6':'#fff'};cursor:pointer;
+      font-family:inherit;font-size:11px;font-weight:${selected?'700':'500'};color:${o.color};
+      transition:background .1s">
+      <span style="width:28px;height:18px;display:flex;align-items:center;justify-content:center;
+        background:${o.bg};border-radius:3px;font-weight:700;font-size:9px;color:${o.color};
+        border:1px solid ${o.color}30">${o.val||'—'}</span>
+      ${o.label}
+      ${selected?'<span style="margin-left:auto;color:var(--navy);font-size:10px">✓</span>':''}
+    </button>`;
+  });
+  
+  // Position near the cell
+  const top = rect.bottom + window.scrollY + 2;
+  let left = rect.left + window.scrollX - 20;
+  if (left + 140 > window.innerWidth) left = window.innerWidth - 150;
+  if (left < 10) left = 10;
+  
+  picker.innerHTML = `
+    <div onclick="closeCellPicker()" style="position:fixed;inset:0;z-index:299;background:transparent"></div>
+    <div style="position:absolute;top:${top}px;left:${left}px;z-index:300;
+      background:white;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.18);
+      border:1px solid var(--border);overflow:hidden;width:140px;
+      animation:fadeIn .12s ease">
+      ${optHtml}
+    </div>`;
+  picker.style.display = 'block';
+}
+
+function pickCellValue(val, funcId, dayIdx, funcName) {
+  closeCellPicker();
+  
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const key = currentPeriod + '_' + funcId;
+  const sch = ESCALAS[key] ? ESCALAS[key].slice() : Array(dates.length).fill('');
+  const oldVal = sch[dayIdx] || '(vazio)';
+  const newVal = val || '(vazio)';
+  sch[dayIdx] = val;
+  ESCALAS[key] = sch;
+
+  // Save to Supabase
+  saveEscala(funcId, currentPeriod, sch);
+
+  // Check if post-validation
+  const vKey = currentPeriod + '_' + loggedUser.gestor_nome;
+  const isPostVal = !!VALIDACOES[vKey];
+
+  // Log
+  const logEntry = {
+    usuario: loggedUser.nome,
+    acao: isPostVal ? 'alterou_pos_validacao' : 'alterou_escala',
+    funcionario_nome: funcName,
+    dia: fmt(dates[dayIdx]),
+    valor_anterior: oldVal,
+    valor_novo: newVal,
+    pos_validacao: isPostVal
+  };
+  saveLog(logEntry);
+  LOGS_DATA.unshift(logEntry);
+
+  if (isPostVal) {
+    const notif = {
+      tipo: 'pos_validacao',
+      mensagem: '⚠️ ' + loggedUser.nome + ' alterou escala de ' + funcName + ' dia ' + fmt(dates[dayIdx]) + ' (' + oldVal + ' → ' + newVal + ') APÓS validação',
+      lida: false
+    };
+    saveNotif(notif);
+    NOTIFS.unshift(notif);
+    showToast('Alteração pós-validação registrada!', 'warning');
+  }
+
+  // Save scroll positions before re-render
+  const gridScroll = document.querySelector('.grid-scroll');
+  const savedScrollLeft = gridScroll ? gridScroll.scrollLeft : 0;
+  const savedScrollTop = window.scrollY;
+
+  renderApp();
+
+  // Restore scroll positions after re-render
+  requestAnimationFrame(() => {
+    const newGridScroll = document.querySelector('.grid-scroll');
+    if (newGridScroll) newGridScroll.scrollLeft = savedScrollLeft;
+    window.scrollTo(0, savedScrollTop);
+  });
+}
+
+function closeCellPicker() {
+  editingCell = null;
+  const picker = document.getElementById('cellPicker');
+  if (picker) picker.style.display = 'none';
+}
+
+// ========== AUTO FILL 6x1 ==========
+function autoFill(funcId) {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const numDays = dates.length;
+  const sch = Array(numDays).fill('');
+  let cnt = 0, sw = 0;
+  for (let i = 0; i < numDays; i++) {
+    const isSun = dates[i].getDay() === 0;
+    if (cnt >= 6 || (isSun && sw >= 2)) {
+      sch[i] = 'DSR'; cnt = 0; if (isSun) sw = 0;
+    } else {
+      sch[i] = 'T'; cnt++; if (isSun) sw++;
+    }
+  }
+  ESCALAS[currentPeriod + '_' + funcId] = sch;
+  saveEscala(funcId, currentPeriod, sch);
+  renderApp();
+}
+
+// ========== VALIDATE ==========
+function doValidate() {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const funcs = getFilteredFuncs();
+  const numDays = dates.length;
+
+  let totalCrit = 0;
+  funcs.forEach(f => {
+    const key = currentPeriod + '_' + f.id;
+    const sch = ESCALAS[key] || Array(numDays).fill('');
+    validate(sch, dates).forEach(a => { if (a.type === 'critical') totalCrit++; });
+  });
+  if (totalCrit > 0) { showToast('Corrija os ' + totalCrit + ' erros críticos antes de validar!', 'error'); return; }
+
+  let empty = 0;
+  funcs.forEach(f => {
+    const key = currentPeriod + '_' + f.id;
+    const sch = ESCALAS[key] || [];
+    for (let i = 0; i < numDays; i++) if (!sch[i]) empty++;
+  });
+  if (empty > numDays * funcs.length * 0.5) { showToast('Preencha pelo menos 50% da escala.', 'error'); return; }
+
+  const vKey = currentPeriod + '_' + loggedUser.gestor_nome;
+  VALIDACOES[vKey] = { ts: nowStr(), gestor: loggedUser.gestor_nome, periodo: per.label };
+
+  // Save
+  sbFetch('validacoes', 'POST', {
+    periodo: currentPeriod,
+    gestor_nome: loggedUser.gestor_nome,
+    data_hora: nowStr(),
+    alertas_pendentes: 0
+  });
+
+  const logE = { usuario: loggedUser.nome, acao: 'validou_escala', funcionario_nome: '—', dia: per.label, valor_anterior: '—', valor_novo: 'Validado', pos_validacao: false };
+  saveLog(logE);
+  LOGS_DATA.unshift(logE);
+
+  const notif = { tipo: 'validacao', mensagem: '✅ ' + loggedUser.nome + ' validou ' + per.label + ' (' + funcs.length + ' funcs)', lida: false };
+  saveNotif(notif);
+  NOTIFS.unshift(notif);
+
+  showToast('Escala validada! RH notificado.', 'success');
+  renderApp();
+}
+
+// ========== SAVE HELPERS ==========
+async function saveEscala(funcId, periodo, valores) {
+  if (sbOnline === false) return; // Skip if offline
+  const existing = await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}`, 'GET');
+  if (existing && existing.length > 0) {
+    await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}`, 'PATCH', { valores: JSON.stringify(valores) });
+  } else {
+    await sbFetch('escalas', 'POST', { funcionario_id: funcId, periodo: periodo, valores: JSON.stringify(valores) });
+  }
+}
+
+async function saveLog(entry) {
+  if (sbOnline === false) return;
+  await sbFetch('logs', 'POST', {
+    usuario: entry.usuario,
+    acao: entry.acao,
+    funcionario_nome: entry.funcionario_nome,
+    dia: entry.dia,
+    valor_anterior: entry.valor_anterior,
+    valor_novo: entry.valor_novo,
+    pos_validacao: entry.pos_validacao || false
+  });
+}
+
+async function saveNotif(notif) {
+  if (sbOnline === false) return;
+  await sbFetch('notificacoes', 'POST', {
+    tipo: notif.tipo,
+    mensagem: notif.mensagem,
+    lida: false
+  });
+}
+
+// ========== DROPDOWNS ==========
+function togglePeriodDD() {
+  document.getElementById('periodDD').classList.toggle('hidden');
+  document.getElementById('gestorDD').classList.add('hidden');
+}
+function toggleGestorDD() {
+  document.getElementById('gestorDD').classList.toggle('hidden');
+  document.getElementById('periodDD').classList.add('hidden');
+}
+function setPeriod(id) {
+  currentPeriod = id;
+  closeAllDD();
+  renderApp();
+}
+function setDeptFilter(val) {
+  deptFilter = val;
+  gestorFilter = 'all';
+  renderApp();
+}
+function setGestorFilterVal(val) {
+  gestorFilter = val;
+  closeAllDD();
+  renderApp();
+}
+function setView(v) {
+  currentView = v;
+  renderApp();
+}
+function showEmpAlerts(id) {
+  currentView = 'alerts';
+  renderApp();
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.btn-period') && !e.target.closest('#periodDD')) {
+    document.getElementById('periodDD').classList.add('hidden');
+  }
+  if (!e.target.closest('.btn-gestor') && !e.target.closest('#gestorDD')) {
+    document.getElementById('gestorDD').classList.add('hidden');
+  }
+});
+
+// ========== NOTIFICATIONS ==========
+function toggleNotif() {
+  const panel = document.getElementById('notifPanel');
+  if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+  const unread = NOTIFS.filter(n => !n.lida).length;
+  let html = `<div class="notif-header"><span style="font-weight:700;font-size:14px">🔔 Notificações</span><div style="display:flex;gap:8px">`;
+  if (unread > 0) html += `<button class="btn-sm" onclick="markAllRead()">Marcar lidas</button>`;
+  html += `<button class="btn-sm" onclick="document.getElementById('notifPanel').classList.add('hidden')">✕</button></div></div>`;
+  if (!NOTIFS.length) {
+    html += '<div style="padding:30px;text-align:center;color:#999;font-size:13px">Nenhuma notificação</div>';
+  } else {
+    NOTIFS.slice(0,50).forEach(n => {
+      const ts = n.created_at ? new Date(n.created_at).toLocaleString('pt-BR') : '';
+      html += `<div class="notif-item ${n.lida?'':'unread'}"><div style="font-size:12px;font-weight:${n.lida?400:600}">${n.mensagem||n.msg||''}</div><div style="font-size:10px;color:#999;margin-top:4px">${ts}</div></div>`;
+    });
+  }
+  panel.innerHTML = html;
+  panel.classList.remove('hidden');
+}
+
+async function markAllRead() {
+  NOTIFS.forEach(n => n.lida = true);
+  await sbFetch('notificacoes', 'PATCH', { lida: true });
+  toggleNotif();
+  renderApp();
+}
+
+// ========== MODALS ==========
+function closeModal() { document.getElementById('modalArea').innerHTML = ''; }
+
+function openChangePass() {
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:380px">
+      <h3>🔑 Trocar Senha</h3>
+      <label>Senha atual</label><input type="password" id="passOld">
+      <label>Nova senha</label><input type="password" id="passNew">
+      <label>Confirmar nova senha</label><input type="password" id="passConfirm">
+      <div class="btns"><button class="btn-primary" onclick="doChangePass()">Salvar</button><button class="btn-cancel" onclick="closeModal()">Cancelar</button></div>
+    </div></div>`;
+}
+
+async function doChangePass() {
+  const old = document.getElementById('passOld').value;
+  const np = document.getElementById('passNew').value;
+  const conf = document.getElementById('passConfirm').value;
+  if (old !== loggedUser.senha) { showToast('Senha atual incorreta', 'error'); return; }
+  if (np.length < 4) { showToast('Senha deve ter no mínimo 4 caracteres', 'error'); return; }
+  if (np !== conf) { showToast('Senhas não conferem', 'error'); return; }
+  loggedUser.senha = np;
+  USERS = USERS.map(u => u.usuario === loggedUser.usuario ? {...u, senha: np} : u);
+  await sbFetch('usuarios?usuario=eq.' + encodeURIComponent(loggedUser.usuario), 'PATCH', { senha: np });
+  closeModal();
+  showToast('Senha alterada com sucesso!', 'success');
+}
+
+function openAddGestor() {
+  let deptOpts = '';
+  DEPTS.forEach(d => { deptOpts += `<option value="${d.id}">${d.nome}</option>`; });
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:420px">
+      <h3>👤+ Adicionar Gestor</h3>
+      <label>Nome completo</label><input id="newGNome">
+      <label>E-mail (login)</label><input id="newGUser" placeholder="nome@kavak.com">
+      <label>Senha inicial</label><input id="newGPass" value="Brasil10">
+      <label>Departamento</label><select id="newGDept"><option value="">Selecione...</option>${deptOpts}<option value="__new">+ Novo departamento</option></select>
+      <div id="newDeptDiv" class="hidden"><label>Nome do novo departamento</label><input id="newDeptNome"></div>
+      <div class="btns"><button class="btn-primary" onclick="doAddGestor()">Salvar</button><button class="btn-cancel" onclick="closeModal()">Cancelar</button></div>
+    </div></div>`;
+  document.getElementById('newGDept').addEventListener('change', function() {
+    document.getElementById('newDeptDiv').classList.toggle('hidden', this.value !== '__new');
+  });
+}
+
+async function doAddGestor() {
+  const nome = document.getElementById('newGNome').value.trim().toUpperCase();
+  const user = document.getElementById('newGUser').value.trim();
+  const pass = document.getElementById('newGPass').value || 'Brasil10';
+  let deptId = document.getElementById('newGDept').value;
+  if (!nome || !user) { showToast('Preencha nome e e-mail', 'error'); return; }
+
+  if (deptId === '__new') {
+    const deptNome = document.getElementById('newDeptNome').value.trim();
+    if (!deptNome) { showToast('Preencha o nome do departamento', 'error'); return; }
+    const r = await sbFetch('departamentos', 'POST', { nome: deptNome });
+    if (r && r.length) { deptId = r[0].id; DEPTS.push(r[0]); }
+    else { showToast('Erro ao criar departamento', 'error'); return; }
+  }
+
+  const rg = await sbFetch('gestores', 'POST', { nome: nome, departamento_id: parseInt(deptId) });
+  if (rg && rg.length) GESTORES.push(rg[0]);
+
+  const ru = await sbFetch('usuarios', 'POST', { usuario: user, senha: pass, nome: nome, role: 'gestor', gestor: nome });
+  if (ru && ru.length) USERS.push({ usuario: user, senha: pass, nome: nome, role: 'gestor', gestor_nome: nome });
+
+  closeModal();
+  showToast('Gestor ' + nome + ' adicionado!', 'success');
+  renderApp();
+}
+
+function openAddFunc() {
+  let gestorOpts = '';
+  GESTORES.forEach(g => { gestorOpts += `<option value="${g.id}">${g.nome}</option>`; });
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:420px">
+      <h3>👥 Adicionar Funcionário</h3>
+      <label>Matrícula</label><input id="newFMat">
+      <label>Nome completo</label><input id="newFNome">
+      <label>Função/Cargo</label><input id="newFFuncao">
+      <label>Gestor responsável</label><select id="newFGestor"><option value="">Selecione...</option>${gestorOpts}</select>
+      <div class="btns"><button class="btn-primary" onclick="doAddFunc()">Salvar</button><button class="btn-cancel" onclick="closeModal()">Cancelar</button></div>
+    </div></div>`;
+}
+
+async function doAddFunc() {
+  const mat = document.getElementById('newFMat').value.trim();
+  const nome = document.getElementById('newFNome').value.trim().toUpperCase();
+  const funcao = document.getElementById('newFFuncao').value.trim().toUpperCase();
+  const gestorId = document.getElementById('newFGestor').value;
+  if (!nome || !gestorId) { showToast('Preencha nome e gestor', 'error'); return; }
+
+  const r = await sbFetch('funcionarios', 'POST', { matricula: mat, nome: nome, funcao: funcao, gestor_id: parseInt(gestorId) });
+  if (r && r.length) { FUNCS.push(r[0]); }
+  else {
+    // Fallback: add locally with next id
+    const maxId = FUNCS.reduce((m,f) => Math.max(m, f.id), 0);
+    FUNCS.push({ id: maxId+1, matricula: mat, nome: nome, funcao: funcao, gestor_id: parseInt(gestorId) });
+  }
+  closeModal();
+  showToast('Funcionário ' + nome + ' adicionado!', 'success');
+  renderApp();
+}
+
+function openTransfer(funcId, funcName) {
+  let gestorOpts = '';
+  GESTORES.forEach(g => { gestorOpts += `<option value="${g.id}">${g.nome}</option>`; });
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:400px">
+      <h3>🔄 Transferir Funcionário</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:12px">${funcName}</p>
+      <label>Novo gestor</label><select id="transferGestor"><option value="">Selecione...</option>${gestorOpts}</select>
+      <div class="btns"><button class="btn-primary" onclick="doTransfer(${funcId})">Transferir</button><button class="btn-cancel" onclick="closeModal()">Cancelar</button></div>
+    </div></div>`;
+}
+
+async function doTransfer(funcId) {
+  const newGestorId = document.getElementById('transferGestor').value;
+  if (!newGestorId) return;
+  const func = FUNCS.find(f => f.id === funcId);
+  if (func) {
+    func.gestor_id = parseInt(newGestorId);
+    await sbFetch('funcionarios?id=eq.' + funcId, 'PATCH', { gestor_id: parseInt(newGestorId) });
+  }
+  closeModal();
+  showToast('Funcionário transferido!', 'success');
+  renderApp();
+}
+
+async function removeFunc(funcId, funcName) {
+  if (!confirm('Excluir ' + funcName + '?')) return;
+  FUNCS = FUNCS.filter(f => f.id !== funcId);
+  await sbFetch('funcionarios?id=eq.' + funcId, 'DELETE');
+  showToast(funcName + ' removido!', 'success');
+  renderApp();
+}
+
+function openImport() {
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:600px">
+      <h3>📥 Importar Funcionários via Excel</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:16px">Colunas esperadas: Departamento, Gestor, Matricula, Nome, Funcao</p>
+      <p style="font-size:11px;color:var(--orange);margin-bottom:12px">⚠️ Importação via Excel requer a biblioteca SheetJS. Para uso completo, integre o upload via Supabase.</p>
+      <input type="file" accept=".xlsx,.xls,.csv" id="importFile" onchange="handleImportFile(this)">
+      <div id="importPreview"></div>
+      <div class="btns" style="margin-top:12px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
+    </div></div>`;
+}
+
+function handleImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  // Basic CSV handling
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').map(l => l.split(','));
+    if (lines.length < 2) { showToast('Arquivo vazio', 'error'); return; }
+    document.getElementById('importPreview').innerHTML = '<p style="color:var(--green);font-size:12px;margin-top:8px">✅ ' + (lines.length-1) + ' linhas detectadas. Processamento CSV básico disponível.</p>';
+  };
+  reader.readAsText(file);
+}
+
+// ========== INIT ==========
+async function init() {
+  await loadData();
+  // Check if user is already set (page reload)
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+init();
+</script>
+</body>
+</html>
