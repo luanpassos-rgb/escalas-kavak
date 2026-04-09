@@ -595,6 +595,21 @@ function validate(sch, dates) {
     if (!has && filled >= 6) a.push({type:'warning', msg:'Semana '+fmt(dates[ws2])+' a '+fmt(dates[Math.min(we-1,n-1)])+' sem DSR/Folga programado', days: Array.from({length:we-ws2},(_,k)=>ws2+k)});
   }
   
+  // REGRA 5: Dois DSR consecutivos — o que não for domingo deve ser FG
+  for (let i = 0; i < n - 1; i++) {
+    if (sch[i] === 'DSR' && sch[i+1] === 'DSR') {
+      const isSun0 = dates[i].getDay() === 0;
+      const isSun1 = dates[i+1].getDay() === 0;
+      if (isSun0) {
+        a.push({type:'warning', msg: fmt(dates[i+1])+' ('+DAYS_L[dates[i+1].getDay()]+') está como DSR. O ideal é considerar como FG (Folga), pois o DSR já está no domingo '+fmt(dates[i]), days:[i+1]});
+      } else if (isSun1) {
+        a.push({type:'warning', msg: fmt(dates[i])+' ('+DAYS_L[dates[i].getDay()]+') está como DSR. O ideal é considerar como FG (Folga), pois o DSR já está no domingo '+fmt(dates[i+1]), days:[i]});
+      } else {
+        a.push({type:'warning', msg: fmt(dates[i])+' e '+fmt(dates[i+1])+' estão como DSR consecutivos. O ideal é manter apenas 1 como DSR e alterar o outro para FG (Folga)', days:[i, i+1]});
+      }
+    }
+  }
+  
   return a;
 }
 
