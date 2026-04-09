@@ -1058,18 +1058,64 @@ function autoFill(funcId) {
   const dates = genDates(per.start, per.end);
   const numDays = dates.length;
   const sch = Array(numDays).fill('');
-  let cnt = 0, sw = 0;
+  
+  // Passo 1: Marcar domingos com regra 2x1 (trabalha 2, folga no 3º)
+  let sunCount = 0;
   for (let i = 0; i < numDays; i++) {
-    const isSun = dates[i].getDay() === 0;
-    if (cnt >= 6 || (isSun && sw >= 2)) {
-      sch[i] = 'DSR'; cnt = 0; if (isSun) sw = 0;
-    } else {
-      sch[i] = 'T'; cnt++; if (isSun) sw++;
+    if (dates[i].getDay() === 0) {
+      sunCount++;
+      if (sunCount === 3) {
+        sch[i] = 'DSR'; // 3º domingo = folga
+        sunCount = 0;
+      } else {
+        sch[i] = 'T'; // 1º e 2º domingo = trabalha
+      }
     }
   }
+  
+  // Passo 2: Preencher dias de semana, garantindo máx 6 consecutivos
+  // Encontrar onde colocar DSR nos dias de semana (1 por semana que não tem domingo DSR)
+  for (let i = 0; i < numDays; i++) {
+    if (sch[i] === '') sch[i] = 'T'; // Preenche tudo como trabalho primeiro
+  }
+  
+  // Passo 3: Para cada sequência de 7+ dias sem DSR, inserir DSR no melhor dia
+  let changed = true;
+  while (changed) {
+    changed = false;
+    let con = 0, si = -1;
+    for (let i = 0; i < numDays; i++) {
+      if (sch[i] === 'T') {
+        if (!con) si = i;
+        con++;
+        if (con > 6) {
+          // Colocar DSR no 6º dia da sequência (preferencialmente não-domingo)
+          const dsrIdx = si + 5;
+          if (dsrIdx < numDays) {
+            sch[dsrIdx] = 'DSR';
+            changed = true;
+          }
+          break;
+        }
+      } else {
+        con = 0; si = -1;
+      }
+    }
+  }
+  
   ESCALAS[currentPeriod + '_' + funcId] = sch;
   saveEscala(funcId, currentPeriod, sch);
+  
+  // Preservar scroll
+  const gridScroll = document.querySelector('.grid-scroll');
+  const savedScrollLeft = gridScroll ? gridScroll.scrollLeft : 0;
+  const savedScrollTop = window.scrollY;
   renderApp();
+  requestAnimationFrame(() => {
+    const gs = document.querySelector('.grid-scroll');
+    if (gs) gs.scrollLeft = savedScrollLeft;
+    window.scrollTo(0, savedScrollTop);
+  });
 }
 
 // ========== VALIDATE ==========
