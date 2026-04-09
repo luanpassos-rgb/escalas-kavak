@@ -358,6 +358,7 @@ const DAYS_L = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
 // ========== FALLBACK DATA ==========
 const FALLBACK_USERS = [
+  {usuario:"admin",senha:"Admin@2026",nome:"ADMINISTRADOR",role:"admin",gestor_nome:null},
   {usuario:"rh",senha:"rh2026",nome:"Departamento Pessoal",role:"rh",gestor_nome:null},
   {usuario:"daniel.dacruz@kavak.com",senha:"Brasil10",nome:"DANIEL RODRIGUES DA CRUZ LOPES",role:"gestor",gestor_nome:"DANIEL RODRIGUES DA CRUZ LOPES"},
   {usuario:"guilherme.pereira@kavak.com",senha:"Brasil10",nome:"GUILHERME THIAGO PEREIRA DE OLIVEIRA",role:"gestor",gestor_nome:"GUILHERME THIAGO PEREIRA DE OLIVEIRA"},
@@ -626,6 +627,21 @@ function showToast(msg, type) {
 function closeAllDD() {
   document.getElementById('periodDD').classList.add('hidden');
   document.getElementById('gestorDD').classList.add('hidden');
+  const am = document.getElementById('actionsMenu');
+  if (am) am.classList.add('hidden');
+}
+
+function toggleActionsMenu() {
+  const am = document.getElementById('actionsMenu');
+  if (!am) return;
+  document.getElementById('periodDD').classList.add('hidden');
+  document.getElementById('gestorDD').classList.add('hidden');
+  am.classList.toggle('hidden');
+}
+
+function closeActionsMenu() {
+  const am = document.getElementById('actionsMenu');
+  if (am) am.classList.add('hidden');
 }
 
 // ========== LOGIN ==========
@@ -659,8 +675,14 @@ document.addEventListener('keydown', e => {
 });
 
 // ========== RENDER ==========
+function getLogName() {
+  if (loggedUser.role === 'admin') return loggedUser.nome + ' / Admin';
+  if (loggedUser.role === 'rh') return loggedUser.nome + ' / Departamento Pessoal';
+  return loggedUser.nome + ' / Gestor';
+}
+
 function getFilteredFuncs() {
-  const isRH = loggedUser.role === 'rh';
+  const isRH = loggedUser.role === 'rh' || loggedUser.role === 'admin';
   const result = [];
   DEPTS.forEach(dept => {
     const deptGestores = GESTORES.filter(g => g.departamento_id === dept.id);
@@ -687,14 +709,15 @@ function getFilteredFuncs() {
 
 function renderApp() {
   if (!loggedUser) return;
-  const isRH = loggedUser.role === 'rh';
+  const isRH = loggedUser.role === 'rh' || loggedUser.role === 'admin';
   const per = PERIODS.find(p => p.id === currentPeriod);
   const dates = genDates(per.start, per.end);
   const numDays = dates.length;
   const funcs = getFilteredFuncs();
 
   // Header
-  document.getElementById('userName').textContent = (isRH ? '🛡️ ' : '👤 ') + loggedUser.nome;
+  const userIcon = loggedUser.role === 'admin' ? '👑' : (isRH ? '🛡️' : '👤');
+  document.getElementById('userName').textContent = userIcon + ' ' + loggedUser.nome + (loggedUser.role === 'admin' ? ' (Admin)' : loggedUser.role === 'rh' ? ' (DP)' : '');
   document.getElementById('btnNotif').classList.toggle('hidden', !isRH);
 
   // Period label
@@ -781,11 +804,18 @@ function renderApp() {
     <button class="tab-btn" style="background:${currentView==='alerts'?'var(--red)':'#e0e0e0'};color:${currentView==='alerts'?'#fff':'#333'}" onclick="setView('alerts')">📊 Alertas</button>`;
   if (isRH) {
     tabs += `<button class="tab-btn" style="background:${currentView==='logs'?'var(--orange)':'#e0e0e0'};color:${currentView==='logs'?'#fff':'#333'}" onclick="setView('logs')">📝 Auditoria</button>`;
-    tabs += `<button class="tab-btn" style="background:var(--green);color:#fff" onclick="openImport()">📥 Importar</button>`;
-    tabs += `<button class="tab-btn" style="background:var(--purple);color:#fff" onclick="openAddGestor()">👤+ Gestor</button>`;
-    tabs += `<button class="tab-btn" style="background:var(--teal);color:#fff" onclick="openAddFunc()">👥+ Func</button>`;
-    tabs += `<button class="tab-btn" style="background:#1565c0;color:#fff" onclick="autoFillAll()">⚡ 6x1 Todos</button>`;
-    tabs += `<button class="tab-btn" style="background:#37474f;color:#fff" onclick="openExport()">📊 Exportar</button>`;
+    tabs += `<div style="position:relative;display:inline-block">
+      <button class="tab-btn" style="background:var(--navy);color:#fff" onclick="toggleActionsMenu()">⚙️ Ações ▼</button>
+      <div id="actionsMenu" class="dropdown hidden" style="right:0;left:auto;min-width:220px">
+        <div class="dropdown-header">Ações disponíveis</div>
+        <button class="dropdown-item" onclick="closeActionsMenu();openAddGestor()"><span style="font-size:14px">👤</span> Adicionar Gestor</button>
+        <button class="dropdown-item" onclick="closeActionsMenu();openAddFunc()"><span style="font-size:14px">👥</span> Adicionar Funcionário</button>
+        <button class="dropdown-item" onclick="closeActionsMenu();openImport()"><span style="font-size:14px">📥</span> Importar Excel</button>
+        <button class="dropdown-item" onclick="closeActionsMenu();autoFillAll()"><span style="font-size:14px">⚡</span> 6x1 Todos</button>
+        <button class="dropdown-item" onclick="closeActionsMenu();openExport()"><span style="font-size:14px">📊</span> Exportar Relatórios</button>
+        ${loggedUser.role === 'admin' ? '<button class="dropdown-item" onclick="closeActionsMenu();openManageUsers()" style="border-top:2px solid #eee"><span style="font-size:14px">👑</span> Gerenciar Usuários</button>' : ''}
+      </div>
+    </div>`;
   }
   document.getElementById('tabsArea').innerHTML = tabs;
 
@@ -807,7 +837,7 @@ function renderApp() {
 
 function renderGrid(funcs, dates, allAlerts) {
   const numDays = dates.length;
-  const isRH = loggedUser.role === 'rh';
+  const isRH = loggedUser.role === 'rh' || loggedUser.role === 'admin';
 
   // Error days map
   const errDays = {};
@@ -911,7 +941,7 @@ function renderAlerts(funcs, dates, allAlerts) {
 }
 
 function renderLogs() {
-  const isRH = loggedUser.role === 'rh';
+  const isRH = loggedUser.role === 'rh' || loggedUser.role === 'admin';
   const fl = isRH ? LOGS_DATA : LOGS_DATA.filter(l => l.usuario === loggedUser.nome);
   let html = `<div class="logs-wrap"><h2 style="font-size:18px;color:var(--navy);margin-bottom:16px">📝 Log de Auditoria</h2>`;
   if (!fl.length) {
@@ -1028,7 +1058,7 @@ function pickCellValue(val, funcId, dayIdx, funcName) {
 
   // Log
   const logEntry = {
-    usuario: loggedUser.nome,
+    usuario: getLogName(),
     acao: isPostVal ? 'alterou_pos_validacao' : 'alterou_escala',
     funcionario_nome: funcName,
     dia: fmt(dates[dayIdx]),
@@ -1042,7 +1072,7 @@ function pickCellValue(val, funcId, dayIdx, funcName) {
   if (isPostVal) {
     const notif = {
       tipo: 'pos_validacao',
-      mensagem: '⚠️ ' + loggedUser.nome + ' alterou escala de ' + funcName + ' dia ' + fmt(dates[dayIdx]) + ' (' + oldVal + ' → ' + newVal + ') APÓS validação',
+      mensagem: '⚠️ ' + getLogName() + ' alterou escala de ' + funcName + ' dia ' + fmt(dates[dayIdx]) + ' (' + oldVal + ' → ' + newVal + ') APÓS validação',
       lida: false
     };
     saveNotif(notif);
@@ -1162,11 +1192,11 @@ function doValidate() {
     alertas_pendentes: 0
   });
 
-  const logE = { usuario: loggedUser.nome, acao: 'validou_escala', funcionario_nome: '—', dia: per.label, valor_anterior: '—', valor_novo: 'Validado', pos_validacao: false };
+  const logE = { usuario: getLogName(), acao: 'validou_escala', funcionario_nome: '—', dia: per.label, valor_anterior: '—', valor_novo: 'Validado', pos_validacao: false };
   saveLog(logE);
   LOGS_DATA.unshift(logE);
 
-  const notif = { tipo: 'validacao', mensagem: '✅ ' + loggedUser.nome + ' validou ' + per.label + ' (' + funcs.length + ' funcs)', lida: false };
+  const notif = { tipo: 'validacao', mensagem: '✅ ' + getLogName() + ' validou ' + per.label + ' (' + funcs.length + ' funcs)', lida: false };
   saveNotif(notif);
   NOTIFS.unshift(notif);
 
@@ -1247,6 +1277,10 @@ document.addEventListener('click', e => {
   }
   if (!e.target.closest('.btn-gestor') && !e.target.closest('#gestorDD')) {
     document.getElementById('gestorDD').classList.add('hidden');
+  }
+  const am = document.getElementById('actionsMenu');
+  if (am && !e.target.closest('#actionsMenu') && !e.target.closest('[onclick*="toggleActionsMenu"]')) {
+    am.classList.add('hidden');
   }
 });
 
@@ -1439,6 +1473,104 @@ function handleImportFile(input) {
     document.getElementById('importPreview').innerHTML = '<p style="color:var(--green);font-size:12px;margin-top:8px">✅ ' + (lines.length-1) + ' linhas detectadas. Processamento CSV básico disponível.</p>';
   };
   reader.readAsText(file);
+}
+
+// ========== ADMIN: MANAGE USERS ==========
+function openManageUsers() {
+  let rhUsers = USERS.filter(u => u.role === 'rh');
+  let gestorUsers = USERS.filter(u => u.role === 'gestor');
+  
+  let rhRows = '';
+  rhUsers.forEach(u => {
+    rhRows += `<tr>
+      <td style="padding:6px 10px;font-weight:600">${u.nome}</td>
+      <td style="padding:6px 10px;font-size:11px">${u.usuario}</td>
+      <td style="padding:6px 10px;font-size:11px">${u.senha}</td>
+      <td style="padding:6px 10px;text-align:center">
+        <button onclick="deleteUser('${u.usuario.replace(/'/g,"\\'")}')" style="background:none;border:none;cursor:pointer;font-size:12px" title="Excluir">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  
+  let gestorRows = '';
+  gestorUsers.forEach(u => {
+    gestorRows += `<tr>
+      <td style="padding:6px 10px;font-weight:600">${u.nome}</td>
+      <td style="padding:6px 10px;font-size:11px">${u.usuario}</td>
+      <td style="padding:6px 10px;font-size:11px">${u.senha}</td>
+      <td style="padding:6px 10px;text-align:center">
+        <button onclick="resetUserPass('${u.usuario.replace(/'/g,"\\'")}')" style="background:none;border:none;cursor:pointer;font-size:12px" title="Resetar senha">🔑</button>
+      </td>
+    </tr>`;
+  });
+
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:600px">
+      <h3>👑 Gerenciar Usuários</h3>
+      
+      <div style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h4 style="margin:0;font-size:14px;color:var(--navy)">🛡️ Usuários de RH (Departamento Pessoal)</h4>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #eee;border-radius:6px;overflow:hidden">
+          <thead><tr style="background:#e8eaf6"><th style="padding:6px 10px;text-align:left">Nome</th><th style="padding:6px 10px;text-align:left">Login</th><th style="padding:6px 10px;text-align:left">Senha</th><th style="padding:6px 10px;width:40px"></th></tr></thead>
+          <tbody>${rhRows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:#999">Nenhum RH cadastrado</td></tr>'}</tbody>
+        </table>
+      </div>
+      
+      <div style="background:#f5f5f5;border-radius:8px;padding:14px;margin-bottom:20px">
+        <h4 style="margin:0 0 10px;font-size:13px;color:var(--navy)">+ Adicionar novo RH</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="newRhNome" placeholder="Nome completo" style="flex:1;min-width:150px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:12px">
+          <input id="newRhUser" placeholder="Login" style="flex:1;min-width:100px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:12px">
+          <input id="newRhPass" placeholder="Senha" value="rh2026" style="width:100px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:12px">
+          <button onclick="addRhUser()" style="padding:8px 16px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px">Adicionar</button>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:16px">
+        <h4 style="margin:0 0 8px;font-size:14px;color:var(--navy)">👤 Gestores (${gestorUsers.length})</h4>
+        <div style="max-height:250px;overflow:auto;border:1px solid #eee;border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#e8eaf6"><th style="padding:6px 10px;text-align:left">Nome</th><th style="padding:6px 10px;text-align:left">Login</th><th style="padding:6px 10px;text-align:left">Senha</th><th style="padding:6px 10px;width:40px"></th></tr></thead>
+            <tbody>${gestorRows}</tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div class="btns"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
+    </div></div>`;
+}
+
+async function addRhUser() {
+  const nome = document.getElementById('newRhNome').value.trim().toUpperCase();
+  const user = document.getElementById('newRhUser').value.trim();
+  const pass = document.getElementById('newRhPass').value || 'rh2026';
+  if (!nome || !user) { showToast('Preencha nome e login', 'error'); return; }
+  if (USERS.find(u => u.usuario === user)) { showToast('Login já existe', 'error'); return; }
+  
+  const newUser = { usuario: user, senha: pass, nome: nome, role: 'rh', gestor_nome: null };
+  USERS.push(newUser);
+  await sbFetch('usuarios', 'POST', newUser);
+  showToast('✅ RH ' + nome + ' adicionado!', 'success');
+  openManageUsers(); // Refresh modal
+}
+
+async function deleteUser(usuario) {
+  if (usuario === 'admin') { showToast('Não é possível excluir o Admin', 'error'); return; }
+  USERS = USERS.filter(u => u.usuario !== usuario);
+  await sbFetch('usuarios?usuario=eq.' + encodeURIComponent(usuario), 'DELETE');
+  showToast('Usuário removido!', 'success');
+  openManageUsers();
+}
+
+async function resetUserPass(usuario) {
+  const newPass = prompt('Nova senha para ' + usuario + ':');
+  if (!newPass || newPass.length < 4) { showToast('Senha deve ter no mínimo 4 caracteres', 'error'); return; }
+  USERS = USERS.map(u => u.usuario === usuario ? {...u, senha: newPass} : u);
+  await sbFetch('usuarios?usuario=eq.' + encodeURIComponent(usuario), 'PATCH', { senha: newPass });
+  showToast('Senha resetada!', 'success');
+  openManageUsers();
 }
 
 // ========== EXPORT ==========
