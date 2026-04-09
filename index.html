@@ -767,6 +767,7 @@ function renderApp() {
     tabs += `<button class="tab-btn" style="background:var(--green);color:#fff" onclick="openImport()">📥 Importar</button>`;
     tabs += `<button class="tab-btn" style="background:var(--purple);color:#fff" onclick="openAddGestor()">👤+ Gestor</button>`;
     tabs += `<button class="tab-btn" style="background:var(--teal);color:#fff" onclick="openAddFunc()">👥+ Func</button>`;
+    tabs += `<button class="tab-btn" style="background:#1565c0;color:#fff" onclick="autoFillAll()">⚡ 6x1 Todos</button>`;
   }
   document.getElementById('tabsArea').innerHTML = tabs;
 
@@ -1065,6 +1066,38 @@ function autoFill(funcId) {
   
   ESCALAS[currentPeriod + '_' + funcId] = sch;
   saveEscala(funcId, currentPeriod, sch);
+  
+  const gridScroll = document.querySelector('.grid-scroll');
+  const savedScrollLeft = gridScroll ? gridScroll.scrollLeft : 0;
+  const savedScrollTop = window.scrollY;
+  renderApp();
+  requestAnimationFrame(() => {
+    const gs = document.querySelector('.grid-scroll');
+    if (gs) gs.scrollLeft = savedScrollLeft;
+    window.scrollTo(0, savedScrollTop);
+  });
+}
+
+function autoFillAll() {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const numDays = dates.length;
+  const funcs = getFilteredFuncs();
+  
+  if (funcs.length === 0) { showToast('Nenhum funcionário visível para preencher.', 'error'); return; }
+  
+  const baseSch = Array(numDays).fill('');
+  for (let i = 0; i < numDays; i++) {
+    baseSch[i] = dates[i].getDay() === 0 ? 'DSR' : 'T';
+  }
+  
+  funcs.forEach(f => {
+    const sch = baseSch.slice();
+    ESCALAS[currentPeriod + '_' + f.id] = sch;
+    saveEscala(f.id, currentPeriod, sch);
+  });
+  
+  showToast('✅ 6x1 aplicado para ' + funcs.length + ' funcionários!', 'success');
   
   const gridScroll = document.querySelector('.grid-scroll');
   const savedScrollLeft = gridScroll ? gridScroll.scrollLeft : 0;
