@@ -514,7 +514,14 @@ async function loadData() {
     let escalas = await sbFetch('escalas?select=*');
     if (escalas && escalas.length > 0) {
       escalas.forEach(e => {
-        ESCALAS[e.periodo + '_' + e.funcionario_id] = e.valores ? (typeof e.valores === 'string' ? JSON.parse(e.valores) : e.valores) : [];
+        const key = e.periodo + '_' + e.funcionario_id;
+        if (!ESCALAS[key]) {
+          // Inicializar array com 31 posições (máximo de dias num período)
+          ESCALAS[key] = Array(35).fill('');
+        }
+        if (e.dia !== null && e.dia !== undefined && e.status) {
+          ESCALAS[key][e.dia] = e.status;
+        }
       });
     }
 
@@ -1049,8 +1056,8 @@ function pickCellValue(val, funcId, dayIdx, funcName) {
     showToast('⚠️ Folga lançada! Lembre-se de registrar no ponto também.', 'warning');
   }
 
-  // Save to Supabase
-  saveEscala(funcId, currentPeriod, sch);
+  // Save to Supabase (only this day)
+  saveEscalaSingleDay(funcId, currentPeriod, dayIdx, val);
 
   // Check if post-validation
   const vKey = currentPeriod + '_' + loggedUser.gestor_nome;
@@ -1206,12 +1213,28 @@ function doValidate() {
 
 // ========== SAVE HELPERS ==========
 async function saveEscala(funcId, periodo, valores) {
-  if (sbOnline === false) return; // Skip if offline
-  const existing = await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}`, 'GET');
-  if (existing && existing.length > 0) {
-    await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}`, 'PATCH', { valores: JSON.stringify(valores) });
-  } else {
-    await sbFetch('escalas', 'POST', { funcionario_id: funcId, periodo: periodo, valores: JSON.stringify(valores) });
+  if (sbOnline === false) return;
+  // Delete existing entries for this func+period
+  await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}`, 'DELETE');
+  // Insert each day as a separate row
+  const rows = [];
+  for (let i = 0; i < valores.length; i++) {
+    if (valores[i]) {
+      rows.push({ funcionario_id: funcId, periodo: periodo, dia: i, status: valores[i], atualizado_por: loggedUser ? getLogName() : '' });
+    }
+  }
+  if (rows.length > 0) {
+    await sbFetch('escalas', 'POST', rows);
+  }
+}
+
+async function saveEscalaSingleDay(funcId, periodo, dayIdx, val) {
+  if (sbOnline === false) return;
+  // Delete existing entry for this specific day
+  await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}&dia=eq.${dayIdx}`, 'DELETE');
+  // Insert new value if not empty
+  if (val) {
+    await sbFetch('escalas', 'POST', { funcionario_id: funcId, periodo: periodo, dia: dayIdx, status: val, atualizado_por: loggedUser ? getLogName() : '' });
   }
 }
 
