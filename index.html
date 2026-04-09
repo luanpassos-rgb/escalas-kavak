@@ -90,7 +90,11 @@ input,select,button,textarea { font-family:inherit; }
 
 /* Legend */
 .legend-bar { padding:6px 20px; background:#fafafa; border-bottom:1px solid #eee; display:flex; gap:8px; flex-wrap:wrap; }
-.legend-item { font-size:10px; padding:2px 8px; border-radius:10px; font-weight:700; }
+/* Legend tooltips */
+.legend-item { font-size:10px; padding:2px 8px; border-radius:10px; font-weight:700; position:relative; cursor:help; }
+.legend-item .tip { display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:500; white-space:nowrap; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+.legend-item .tip::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:#333; }
+.legend-item:hover .tip { display:block; }
 
 /* Grid */
 .grid-wrap { padding:12px 8px; }
@@ -110,6 +114,8 @@ input,select,button,textarea { font-family:inherit; }
 .cell-T { background:var(--green-bg); color:var(--green); }
 .cell-DSR { background:var(--blue-bg); color:var(--blue); }
 .cell-F { background:var(--red-bg); color:var(--red); }
+.cell-FG { background:#fff9c4; color:#f57f17; }
+.cell-AT { background:#e1bee7; color:#7b1fa2; }
 .cell-empty { background:#fafafa; color:#ccc; }
 .cell select { width:48px; height:28px; border:1px solid #90a4ae; border-radius:4px; font-weight:700; font-size:10px; text-align:center; cursor:pointer; outline:none; padding:0; font-family:inherit; }
 
@@ -258,9 +264,11 @@ input,select,button,textarea { font-family:inherit; }
 
   <!-- Legend -->
   <div class="legend-bar">
-    <span class="legend-item" style="background:var(--green-bg);color:var(--green)">T = Trabalho</span>
-    <span class="legend-item" style="background:var(--blue-bg);color:var(--blue)">DSR = Descanso Semanal</span>
-    <span class="legend-item" style="background:var(--red-bg);color:var(--red)">F = Falta</span>
+    <span class="legend-item" style="background:var(--green-bg);color:var(--green)">🟢 T = Trabalho<span class="tip">Dia normal de trabalho</span></span>
+    <span class="legend-item" style="background:var(--blue-bg);color:var(--blue)">🔵 DSR = Descanso Semanal<span class="tip">Descanso Semanal Remunerado. Não trabalha, mas recebe normalmente</span></span>
+    <span class="legend-item" style="background:var(--red-bg);color:var(--red)">🔴 F = Falta<span class="tip">Falta não justificada. O funcionário não compareceu</span></span>
+    <span class="legend-item" style="background:#fff9c4;color:#f57f17">🟡 FG = Folga<span class="tip">Folga por feriado ou acordo. ⚠️ Gestor deve lançar no ponto também</span></span>
+    <span class="legend-item" style="background:#e1bee7;color:#7b1fa2">🟣 AT = Atestado<span class="tip">Ausência justificada por atestado médico</span></span>
   </div>
 
   <!-- Content -->
@@ -553,7 +561,7 @@ function validate(sch, dates) {
       if (!con) si = i;
       con++;
       if (con > 6) a.push({type:'critical', msg: con+' dias consecutivos sem DSR ('+fmt(dates[si])+' a '+fmt(dates[i])+')', days: Array.from({length:con},(_,k)=>si+k)});
-    } else if (v === 'DSR' || v === 'F') con = 0;
+    } else if (v === 'DSR' || v === 'F' || v === 'FG' || v === 'AT') con = 0;
   }
   
   // Coletar domingos do período
@@ -565,16 +573,16 @@ function validate(sch, dates) {
   for (let s = 0; s < suns.length; s++) {
     const idx = suns[s], v = sch[idx];
     if (v === 'T') { ws++; if (ws >= 3) a.push({type:'critical', msg:'3 domingos consecutivos trabalhados (regra 2x1). '+fmt(dates[idx])+' DEVE ser DSR', days:[idx]}); }
-    else if (v === 'DSR') ws = 0;
+    else if (v === 'DSR' || v === 'FG') ws = 0;
   }
   
   // REGRA 3: Pelo menos 1 domingo de folga no mês
   if (suns.length > 0) {
-    const sunsFilled = suns.filter(i => sch[i] === 'T' || sch[i] === 'DSR' || sch[i] === 'F');
+    const sunsFilled = suns.filter(i => sch[i] === 'T' || sch[i] === 'DSR' || sch[i] === 'F' || sch[i] === 'FG' || sch[i] === 'AT');
     if (sunsFilled.length > 0) {
-      const sunsDSR = suns.filter(i => sch[i] === 'DSR');
+      const sunsDSR = suns.filter(i => sch[i] === 'DSR' || sch[i] === 'FG');
       if (sunsDSR.length === 0) {
-        a.push({type:'critical', msg:'Nenhum domingo com DSR no período. É obrigatório pelo menos 1 domingo de folga por mês', days: suns});
+        a.push({type:'critical', msg:'Nenhum domingo com DSR/Folga no período. É obrigatório pelo menos 1 domingo de folga por mês', days: suns});
       }
     }
   }
@@ -583,8 +591,8 @@ function validate(sch, dates) {
   for (let w = 0; w < Math.floor(n/7); w++) {
     const ws2 = w*7, we = Math.min(ws2+7, n);
     let has = false, filled = 0;
-    for (let i = ws2; i < we; i++) { if (sch[i]==='DSR') has=true; if (sch[i]) filled++; }
-    if (!has && filled >= 6) a.push({type:'warning', msg:'Semana '+fmt(dates[ws2])+' a '+fmt(dates[Math.min(we-1,n-1)])+' sem DSR programado', days: Array.from({length:we-ws2},(_,k)=>ws2+k)});
+    for (let i = ws2; i < we; i++) { if (sch[i]==='DSR' || sch[i]==='FG') has=true; if (sch[i]) filled++; }
+    if (!has && filled >= 6) a.push({type:'warning', msg:'Semana '+fmt(dates[ws2])+' a '+fmt(dates[Math.min(we-1,n-1)])+' sem DSR/Folga programado', days: Array.from({length:we-ws2},(_,k)=>ws2+k)});
   }
   
   return a;
@@ -936,8 +944,10 @@ function openCellEdit(el, funcId, dayIdx, funcName) {
   const options = [
     {val:'', label:'Limpar', bg:'#f5f5f5', color:'#999'},
     {val:'T', label:'Trabalho', bg:'var(--green-bg)', color:'var(--green)'},
-    {val:'DSR', label:'Descanso', bg:'var(--blue-bg)', color:'var(--blue)'},
-    {val:'F', label:'Falta', bg:'var(--red-bg)', color:'var(--red)'}
+    {val:'DSR', label:'Descanso Remunerado', bg:'var(--blue-bg)', color:'var(--blue)'},
+    {val:'F', label:'Falta', bg:'var(--red-bg)', color:'var(--red)'},
+    {val:'FG', label:'Folga', bg:'#fff9c4', color:'#f57f17'},
+    {val:'AT', label:'Atestado', bg:'#e1bee7', color:'#7b1fa2'}
   ];
   
   let optHtml = '';
@@ -984,6 +994,11 @@ function pickCellValue(val, funcId, dayIdx, funcName) {
   const newVal = val || '(vazio)';
   sch[dayIdx] = val;
   ESCALAS[key] = sch;
+
+  // Lembrete ao lançar Folga
+  if (val === 'FG') {
+    showToast('⚠️ Folga lançada! Lembre-se de registrar no ponto também.', 'warning');
+  }
 
   // Save to Supabase
   saveEscala(funcId, currentPeriod, sch);
