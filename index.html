@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 <title>Sistema de Escalas 6x1 — Kavak</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -784,6 +785,7 @@ function renderApp() {
     tabs += `<button class="tab-btn" style="background:var(--purple);color:#fff" onclick="openAddGestor()">👤+ Gestor</button>`;
     tabs += `<button class="tab-btn" style="background:var(--teal);color:#fff" onclick="openAddFunc()">👥+ Func</button>`;
     tabs += `<button class="tab-btn" style="background:#1565c0;color:#fff" onclick="autoFillAll()">⚡ 6x1 Todos</button>`;
+    tabs += `<button class="tab-btn" style="background:#37474f;color:#fff" onclick="openExport()">📊 Exportar</button>`;
   }
   document.getElementById('tabsArea').innerHTML = tabs;
 
@@ -1437,6 +1439,168 @@ function handleImportFile(input) {
     document.getElementById('importPreview').innerHTML = '<p style="color:var(--green);font-size:12px;margin-top:8px">✅ ' + (lines.length-1) + ' linhas detectadas. Processamento CSV básico disponível.</p>';
   };
   reader.readAsText(file);
+}
+
+// ========== EXPORT ==========
+function openExport() {
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:450px">
+      <h3>📊 Exportar Relatórios — ${PERIODS.find(p=>p.id===currentPeriod).label}</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:16px">Selecione o relatório para gerar em Excel:</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="exportEscala()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:background .15s">
+          <span style="font-size:22px">📋</span>
+          <div><div style="font-weight:700;font-size:13px;color:var(--navy)">Escala do Mês</div>
+          <div style="font-size:11px;color:#666">Grade completa com T, DSR, F, FG, AT por funcionário</div></div>
+        </button>
+        <button onclick="exportAlertas()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:background .15s">
+          <span style="font-size:22px">⚠️</span>
+          <div><div style="font-weight:700;font-size:13px;color:var(--orange)">Relatório de Alertas</div>
+          <div style="font-size:11px;color:#666">Gestor, funcionário, quantidade e descrição dos alertas</div></div>
+        </button>
+        <button onclick="exportAuditoria()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:background .15s">
+          <span style="font-size:22px">📝</span>
+          <div><div style="font-weight:700;font-size:13px;color:var(--orange)">Auditoria</div>
+          <div style="font-size:11px;color:#666">Log completo de alterações (quem, quando, de/para)</div></div>
+        </button>
+        <button onclick="exportResumo()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:background .15s">
+          <span style="font-size:22px">📈</span>
+          <div><div style="font-weight:700;font-size:13px;color:var(--green)">Resumo por Funcionário</div>
+          <div style="font-size:11px;color:#666">Qtd de dias T, DSR, F, FG, AT e vazios por pessoa</div></div>
+        </button>
+      </div>
+      <div class="btns" style="margin-top:16px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
+    </div></div>`;
+}
+
+function downloadXlsx(wb, filename) {
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const blob = new Blob([wbout], {type:'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ ' + filename + ' exportado!', 'success');
+}
+
+function exportEscala() {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const funcs = getFilteredFuncs();
+  
+  const header = ['N','Matrícula','Nome','Função','Departamento','Gestor'];
+  dates.forEach(d => header.push(DAYS_L[d.getDay()]+' '+fmt(d)));
+  
+  const rows = [header];
+  let n = 0;
+  funcs.forEach(f => {
+    n++;
+    const key = currentPeriod + '_' + f.id;
+    const sch = ESCALAS[key] || Array(dates.length).fill('');
+    const row = [n, f.matricula, f.nome, f.funcao, f.dept_nome, f.gestor_nome];
+    sch.forEach(v => row.push(v || ''));
+    rows.push(row);
+  });
+  
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:4},{wch:8},{wch:35},{wch:25},{wch:30},{wch:35}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Escala ' + per.label);
+  downloadXlsx(wb, 'Escala_' + per.label.replace('/','-') + '.xlsx');
+  closeModal();
+}
+
+function exportAlertas() {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const funcs = getFilteredFuncs();
+  
+  const rows = [['Gestor','Matrícula','Funcionário','Função','Qtd Alertas','Tipo','Descrição do Alerta']];
+  
+  funcs.forEach(f => {
+    const key = currentPeriod + '_' + f.id;
+    const sch = ESCALAS[key] || Array(dates.length).fill('');
+    const als = validate(sch, dates);
+    if (als.length === 0) {
+      rows.push([f.gestor_nome, f.matricula, f.nome, f.funcao, 0, '✅ OK', 'Sem alertas']);
+    } else {
+      als.forEach((al, i) => {
+        rows.push([
+          i === 0 ? f.gestor_nome : '',
+          i === 0 ? f.matricula : '',
+          i === 0 ? f.nome : '',
+          i === 0 ? f.funcao : '',
+          i === 0 ? als.length : '',
+          al.type === 'critical' ? '⛔ CRÍTICO' : '⚠️ ALERTA',
+          al.msg
+        ]);
+      });
+    }
+  });
+  
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:35},{wch:8},{wch:35},{wch:25},{wch:10},{wch:12},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Alertas ' + per.label);
+  downloadXlsx(wb, 'Alertas_' + per.label.replace('/','-') + '.xlsx');
+  closeModal();
+}
+
+function exportAuditoria() {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const rows = [['Data/Hora','Usuário','Ação','Funcionário','Dia','De','Para','Pós-Validação']];
+  
+  const fl = LOGS_DATA.slice(0, 500);
+  fl.forEach(l => {
+    const ts = l.created_at ? new Date(l.created_at).toLocaleString('pt-BR') : (l.data_hora || l.ts || '');
+    rows.push([
+      ts,
+      l.usuario || '',
+      l.acao || '',
+      l.funcionario_nome || l.func || '',
+      l.dia || l.data || '',
+      l.valor_anterior || l.de || '',
+      l.valor_novo || l.para || '',
+      l.pos_validacao ? 'SIM' : 'NÃO'
+    ]);
+  });
+  
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:20},{wch:30},{wch:20},{wch:35},{wch:8},{wch:8},{wch:8},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Auditoria');
+  downloadXlsx(wb, 'Auditoria_' + per.label.replace('/','-') + '.xlsx');
+  closeModal();
+}
+
+function exportResumo() {
+  const per = PERIODS.find(p => p.id === currentPeriod);
+  const dates = genDates(per.start, per.end);
+  const funcs = getFilteredFuncs();
+  
+  const rows = [['Matrícula','Nome','Função','Departamento','Gestor','Dias T','Dias DSR','Dias F','Dias FG','Dias AT','Vazios','Total Dias']];
+  
+  funcs.forEach(f => {
+    const key = currentPeriod + '_' + f.id;
+    const sch = ESCALAS[key] || Array(dates.length).fill('');
+    let t=0,dsr=0,fa=0,fg=0,at=0,vz=0;
+    sch.forEach(v => {
+      if (v==='T') t++;
+      else if (v==='DSR') dsr++;
+      else if (v==='F') fa++;
+      else if (v==='FG') fg++;
+      else if (v==='AT') at++;
+      else vz++;
+    });
+    rows.push([f.matricula, f.nome, f.funcao, f.dept_nome, f.gestor_nome, t, dsr, fa, fg, at, vz, dates.length]);
+  });
+  
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:8},{wch:35},{wch:25},{wch:30},{wch:35},{wch:7},{wch:7},{wch:7},{wch:7},{wch:7},{wch:7},{wch:9}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Resumo ' + per.label);
+  downloadXlsx(wb, 'Resumo_' + per.label.replace('/','-') + '.xlsx');
+  closeModal();
 }
 
 // ========== INIT ==========
