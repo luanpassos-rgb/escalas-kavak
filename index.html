@@ -532,10 +532,10 @@ async function loadData() {
       });
     }
 
-    let logs = await sbFetch('logs?select=*&order=created_at.desc&limit=500');
+    let logs = await sbFetch('logs?select=*&order=ts.desc&limit=500');
     if (logs && logs.length > 0) LOGS_DATA = logs;
 
-    let notifs = await sbFetch('notificacoes?select=*&order=created_at.desc&limit=100');
+    let notifs = await sbFetch('notificacoes?select=*&order=id.desc&limit=100');
     if (notifs && notifs.length > 0) NOTIFS = notifs;
 
     console.log('✅ Dados carregados do Supabase');
@@ -956,14 +956,14 @@ function renderLogs() {
   } else {
     html += '<table class="logs-table"><thead><tr><th>Data/Hora</th><th>Usuário</th><th>Ação</th><th>Funcionário</th><th>Dia</th><th>De → Para</th><th>Pós-Valid.</th></tr></thead><tbody>';
     fl.slice(0,200).forEach((l,i) => {
-      const ts = l.created_at ? new Date(l.created_at).toLocaleString('pt-BR') : (l.data_hora || '');
+      const ts = l.ts ? new Date(l.ts).toLocaleString('pt-BR') : '';
       html += `<tr class="${l.pos_validacao?'post-val':''}">
         <td style="font-size:11px">${ts}</td>
         <td style="font-weight:600">${l.usuario||''}</td>
         <td>${l.acao||''}</td>
-        <td>${l.funcionario_nome||l.func||''}</td>
-        <td style="text-align:center">${l.dia||l.data||''}</td>
-        <td style="text-align:center;font-weight:600">${(l.valor_anterior||l.de||'')} → ${(l.valor_novo||l.para||'')}</td>
+        <td>${l.funcionario||''}</td>
+        <td style="text-align:center">${l.dia||''}</td>
+        <td style="text-align:center;font-weight:600">${(l.valor_anterior||'')} → ${(l.valor_novo||'')}</td>
         <td style="text-align:center">${l.pos_validacao?'<span style="background:var(--red);color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">SIM</span>':'<span style="color:#999;font-size:10px">—</span>'}</td>
       </tr>`;
     });
@@ -1243,7 +1243,7 @@ async function saveLog(entry) {
   await sbFetch('logs', 'POST', {
     usuario: entry.usuario,
     acao: entry.acao,
-    funcionario_nome: entry.funcionario_nome,
+    funcionario: entry.funcionario_nome,
     dia: entry.dia,
     valor_anterior: entry.valor_anterior,
     valor_novo: entry.valor_novo,
@@ -1319,8 +1319,8 @@ function toggleNotif() {
     html += '<div style="padding:30px;text-align:center;color:#999;font-size:13px">Nenhuma notificação</div>';
   } else {
     NOTIFS.slice(0,50).forEach(n => {
-      const ts = n.created_at ? new Date(n.created_at).toLocaleString('pt-BR') : '';
-      html += `<div class="notif-item ${n.lida?'':'unread'}"><div style="font-size:12px;font-weight:${n.lida?400:600}">${n.mensagem||n.msg||''}</div><div style="font-size:10px;color:#999;margin-top:4px">${ts}</div></div>`;
+      const ts = n.ts ? new Date(n.ts).toLocaleString('pt-BR') : (n.created_at ? new Date(n.created_at).toLocaleString('pt-BR') : '');
+      html += `<div class="notif-item ${n.lida?'':'unread'}"><div style="font-size:12px;font-weight:${n.lida?400:600}">${n.mensagem||''}</div><div style="font-size:10px;color:#999;margin-top:4px">${ts}</div></div>`;
     });
   }
   panel.innerHTML = html;
@@ -1707,15 +1707,15 @@ function exportAuditoria() {
   
   const fl = LOGS_DATA.slice(0, 500);
   fl.forEach(l => {
-    const ts = l.created_at ? new Date(l.created_at).toLocaleString('pt-BR') : (l.data_hora || l.ts || '');
+    const ts = l.ts ? new Date(l.ts).toLocaleString('pt-BR') : '';
     rows.push([
       ts,
       l.usuario || '',
       l.acao || '',
-      l.funcionario_nome || l.func || '',
-      l.dia || l.data || '',
-      l.valor_anterior || l.de || '',
-      l.valor_novo || l.para || '',
+      l.funcionario || '',
+      l.dia || '',
+      l.valor_anterior || '',
+      l.valor_novo || '',
       l.pos_validacao ? 'SIM' : 'NÃO'
     ]);
   });
