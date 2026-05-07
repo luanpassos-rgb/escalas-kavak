@@ -368,7 +368,7 @@ let FERIADOS = {}; // {periodo: [{data_idx, descricao}]}
 let FERIAS = {};   // {"periodo_funcId": [dia_idx, dia_idx, ...]}
 let PERIOD_LOCKS = {}; // {periodo: true/false}
 
-const PERIODS = [
+const DEFAULT_PERIODS = [
   {id:"mar26",label:"Mar/2026",start:"2026-03-11",end:"2026-04-10"},
   {id:"apr26",label:"Abr/2026",start:"2026-04-11",end:"2026-05-10"},
   {id:"may26",label:"Mai/2026",start:"2026-05-11",end:"2026-06-10"},
@@ -380,6 +380,17 @@ const PERIODS = [
   {id:"nov26",label:"Nov/2026",start:"2026-11-11",end:"2026-12-10"},
   {id:"dec26",label:"Dez/2026",start:"2026-12-11",end:"2027-01-10"},
 ];
+let PERIODS = DEFAULT_PERIODS.slice();
+
+// Carregar períodos extras do localStorage
+try {
+  const extraP = localStorage.getItem('kavak_periods');
+  if (extraP) {
+    const extras = JSON.parse(extraP);
+    extras.forEach(p => { if (!PERIODS.find(pp => pp.id === p.id)) PERIODS.push(p); });
+    PERIODS.sort((a,b) => a.start.localeCompare(b.start));
+  }
+} catch(e) {}
 
 const DAYS_L = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
@@ -869,7 +880,8 @@ function renderApp() {
         <button class="dropdown-item" onclick="closeActionsMenu();autoFillAll()"><span style="font-size:14px">⚡</span> 6x1 Todos</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openExport()"><span style="font-size:14px">📊</span> Exportar Relatórios</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openTransferAll()"><span style="font-size:14px">🔄</span> Transferir Equipe</button>
-        <button class="dropdown-item" onclick="closeActionsMenu();openFeriados()" style="border-top:2px solid #eee"><span style="font-size:14px">📌</span> Feriados</button>
+        <button class="dropdown-item" onclick="closeActionsMenu();openNewPeriod()" style="border-top:2px solid #eee"><span style="font-size:14px">📅</span> Novo Período</button>
+        <button class="dropdown-item" onclick="closeActionsMenu();openFeriados()"><span style="font-size:14px">📌</span> Feriados</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openFerias()"><span style="font-size:14px">🌴</span> Férias</button>
         <button class="dropdown-item" onclick="closeActionsMenu();togglePeriodLock()"><span style="font-size:14px">${isPeriodLocked()?'🔓':'🔒'}</span> ${isPeriodLocked()?'Liberar':'Travar'} Período</button>
         ${loggedUser.role === 'admin' ? '<button class="dropdown-item" onclick="closeActionsMenu();openManageUsers()" style="border-top:2px solid #eee"><span style="font-size:14px">👑</span> Gerenciar Usuários</button>' : ''}
@@ -1809,30 +1821,180 @@ async function removeFunc(funcId, funcName) {
   renderApp();
 }
 
+let importData = null;
+
 function openImport() {
+  importData = null;
   document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:600px">
-      <h3>📥 Importar Funcionários via Excel</h3>
-      <p style="font-size:12px;color:#666;margin-bottom:16px">Colunas esperadas: Departamento, Gestor, Matricula, Nome, Funcao</p>
-      <p style="font-size:11px;color:var(--orange);margin-bottom:12px">⚠️ Importação via Excel requer a biblioteca SheetJS. Para uso completo, integre o upload via Supabase.</p>
-      <input type="file" accept=".xlsx,.xls,.csv" id="importFile" onchange="handleImportFile(this)">
+    <div class="modal" style="width:650px">
+      <h3>📥 Importar Base de Funcionários</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:8px">Formato: CSV separado por <strong>;</strong> (ponto e vírgula)</p>
+      <p style="font-size:11px;color:#0467FC;margin-bottom:12px">Colunas: Matricula; Nome; Funcao; Divisao; Gestor; Email; Unidade</p>
+      <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#92400e">⚠️ Atenção: esta importação substitui TODA a base atual.</div>
+        <div style="font-size:11px;color:#92400e;margin-top:2px">Escalas e logs não são afetados.</div>
+      </div>
+      <input type="file" accept=".csv" id="importFile" onchange="handleImportFile(this)" style="margin-bottom:12px">
       <div id="importPreview"></div>
-      <div class="btns" style="margin-top:12px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
+      <div id="importActions" class="hidden btns" style="margin-top:12px">
+        <button class="btn-primary" onclick="confirmImport()" style="background:#16a34a">✅ Confirmar Importação</button>
+        <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      </div>
+      <div class="btns" style="margin-top:8px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
     </div></div>`;
 }
 
 function handleImportFile(input) {
   const file = input.files[0];
   if (!file) return;
-  // Basic CSV handling
   const reader = new FileReader();
   reader.onload = function(e) {
     const text = e.target.result;
-    const lines = text.split('\n').map(l => l.split(','));
+    const lines = text.split('\n').filter(l => l.trim());
     if (lines.length < 2) { showToast('Arquivo vazio', 'error'); return; }
-    document.getElementById('importPreview').innerHTML = '<p style="color:var(--green);font-size:12px;margin-top:8px">✅ ' + (lines.length-1) + ' linhas detectadas. Processamento CSV básico disponível.</p>';
+    
+    const header = lines[0].split(';').map(h => h.trim());
+    const rows = [];
+    const errors = [];
+    const mats = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(';').map(c => c.trim());
+      if (cols.length < 6 || !cols[1]) continue;
+      
+      const row = {
+        mat: cols[0] || '',
+        nome: cols[1] || '',
+        funcao: cols[2] || '',
+        divisao: cols[3] || '',
+        gestor: cols[4] || '',
+        email: cols[5] || '',
+        unidade: cols[6] || ''
+      };
+      
+      // Validações
+      if (!row.nome) errors.push('Linha ' + (i+1) + ': nome vazio');
+      if (!row.gestor) errors.push('Linha ' + (i+1) + ': gestor vazio (' + row.nome + ')');
+      if (!row.email) errors.push('Linha ' + (i+1) + ': email vazio (' + row.nome + ')');
+      if (!row.unidade) errors.push('Linha ' + (i+1) + ': unidade vazia (' + row.nome + ')');
+      if (row.mat && mats.includes(row.mat)) errors.push('Linha ' + (i+1) + ': matrícula duplicada ' + row.mat);
+      if (row.mat) mats.push(row.mat);
+      
+      rows.push(row);
+    }
+    
+    // Resumo
+    const gestores = [...new Set(rows.map(r => r.gestor))];
+    const divisoes = [...new Set(rows.map(r => r.divisao))];
+    const unidades = [...new Set(rows.map(r => r.unidade).filter(u => u))];
+    
+    let html = '<div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">';
+    html += '<div style="padding:10px 14px;background:#EBF1FF;font-weight:700;font-size:13px;color:#0467FC">📊 Resumo da Importação</div>';
+    html += '<div style="padding:10px 14px;font-size:12px">';
+    html += '<div><strong>' + rows.length + '</strong> funcionários</div>';
+    html += '<div><strong>' + gestores.length + '</strong> gestores: ' + gestores.join(', ').substring(0,100) + (gestores.join(', ').length > 100 ? '...' : '') + '</div>';
+    html += '<div><strong>' + divisoes.length + '</strong> divisões</div>';
+    html += '<div><strong>' + unidades.length + '</strong> unidades: ' + unidades.join(', ') + '</div>';
+    html += '</div>';
+    
+    if (errors.length > 0) {
+      html += '<div style="padding:10px 14px;background:#fef2f2;border-top:1px solid #fca5a5">';
+      html += '<div style="font-weight:700;color:#dc2626;font-size:12px">❌ ' + errors.length + ' erro(s) encontrado(s):</div>';
+      errors.slice(0,10).forEach(err => { html += '<div style="font-size:11px;color:#dc2626;margin-top:2px">• ' + err + '</div>'; });
+      if (errors.length > 10) html += '<div style="font-size:11px;color:#dc2626;margin-top:2px">... e mais ' + (errors.length-10) + '</div>';
+      html += '</div>';
+    } else {
+      html += '<div style="padding:10px 14px;background:#f0fdf4;border-top:1px solid #86efac">';
+      html += '<div style="font-weight:700;color:#16a34a;font-size:12px">✅ Validação OK! Pronto para importar.</div>';
+      html += '</div>';
+    }
+    
+    // Preview tabela
+    html += '<div style="padding:10px 14px;max-height:200px;overflow:auto;border-top:1px solid #e0e0e0">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="background:#f5f5f5">';
+    html += '<th style="padding:3px 6px;text-align:left">Mat</th><th style="padding:3px 6px;text-align:left">Nome</th><th style="padding:3px 6px;text-align:left">Função</th><th style="padding:3px 6px;text-align:left">Gestor</th><th style="padding:3px 6px;text-align:left">Unidade</th>';
+    html += '</tr></thead><tbody>';
+    rows.slice(0,15).forEach(r => {
+      html += '<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:3px 6px">' + r.mat + '</td><td style="padding:3px 6px">' + r.nome + '</td><td style="padding:3px 6px">' + r.funcao + '</td><td style="padding:3px 6px">' + r.gestor + '</td><td style="padding:3px 6px">' + r.unidade + '</td></tr>';
+    });
+    if (rows.length > 15) html += '<tr><td colspan="5" style="padding:6px;text-align:center;color:#999">... e mais ' + (rows.length-15) + ' linhas</td></tr>';
+    html += '</tbody></table></div></div>';
+    
+    document.getElementById('importPreview').innerHTML = html;
+    
+    if (errors.length === 0) {
+      importData = rows;
+      document.getElementById('importActions').classList.remove('hidden');
+    } else {
+      importData = null;
+      document.getElementById('importActions').classList.add('hidden');
+    }
   };
-  reader.readAsText(file);
+  reader.readAsText(file, 'latin1');
+}
+
+async function confirmImport() {
+  if (!importData || importData.length === 0) return;
+  
+  showToast('⏳ Importando ' + importData.length + ' funcionários...', 'info');
+  
+  // 1. Limpar tabelas
+  await sbFetch('funcionarios?id=gt.0', 'DELETE');
+  await sbFetch('gestores?id=gt.0', 'DELETE');
+  await sbFetch('departamentos?id=gt.0', 'DELETE');
+  await sbFetch("usuarios?role=eq.gestor", 'DELETE');
+  
+  // 2. Criar departamentos
+  const deptMap = {};
+  let deptId = 1;
+  importData.forEach(r => {
+    if (r.divisao && !deptMap[r.divisao]) { deptMap[r.divisao] = deptId++; }
+  });
+  for (const [nome, id] of Object.entries(deptMap)) {
+    await sbFetch('departamentos', 'POST', {id: id, nome: nome});
+  }
+  
+  // 3. Criar gestores e usuários
+  const gestorMap = {};
+  let gestorId = 1;
+  importData.forEach(r => {
+    if (r.gestor && !gestorMap[r.gestor]) {
+      gestorMap[r.gestor] = {id: gestorId++, email: r.email, divisao: r.divisao};
+    }
+  });
+  for (const [nome, info] of Object.entries(gestorMap)) {
+    await sbFetch('gestores', 'POST', {id: info.id, nome: nome, departamento_id: deptMap[info.divisao]});
+    await sbFetch('usuarios', 'POST', {usuario: info.email, senha: 'Brasil10', nome: nome, role: 'gestor', gestor: nome});
+  }
+  
+  // 4. Criar funcionários
+  let funcId = 1;
+  for (const r of importData) {
+    await sbFetch('funcionarios', 'POST', {
+      id: funcId, matricula: r.mat, nome: r.nome, funcao: r.funcao,
+      gestor_id: gestorMap[r.gestor].id, unidade: r.unidade
+    });
+    funcId++;
+  }
+  
+  // 5. Atualizar dados locais
+  DEPTS = Object.entries(deptMap).map(([nome,id]) => ({id,nome}));
+  GESTORES = Object.entries(gestorMap).map(([nome,info]) => ({id:info.id,nome,departamento_id:deptMap[info.divisao]}));
+  FUNCS = importData.map((r,i) => ({id:i+1,matricula:r.mat,nome:r.nome,funcao:r.funcao,gestor_id:gestorMap[r.gestor].id,unidade:r.unidade}));
+  USERS = USERS.filter(u => u.role !== 'gestor');
+  Object.entries(gestorMap).forEach(([nome,info]) => {
+    USERS.push({usuario:info.email,senha:'Brasil10',nome:nome,role:'gestor',gestor_nome:nome});
+  });
+  
+  // Log
+  const logE = {usuario:getLogName(),acao:'importacao_base',funcionario_nome:importData.length+' funcionários',dia:'—',valor_anterior:'—',valor_novo:'Importado',pos_validacao:false};
+  saveLog(logE);
+  LOGS_DATA.unshift(logE);
+  
+  closeModal();
+  showToast('✅ ' + importData.length + ' funcionários importados com sucesso!', 'success');
+  importData = null;
+  renderApp();
 }
 
 // ========== ADMIN: MANAGE USERS ==========
@@ -2186,6 +2348,102 @@ function exportResumo() {
   XLSX.utils.book_append_sheet(wb, ws, 'Resumo ' + per.label);
   downloadXlsx(wb, 'Resumo_' + per.label.replace('/','-') + '.xlsx');
   closeModal();
+}
+
+// ========== NOVO PERÍODO ==========
+const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function openNewPeriod() {
+  // Encontrar próximo período sugerido
+  const lastP = PERIODS[PERIODS.length - 1];
+  const lastEnd = new Date(lastP.end + 'T12:00:00');
+  const nextMonth = lastEnd.getMonth(); // Já é o mês do próximo período
+  const nextYear = lastEnd.getFullYear();
+  
+  let yearOpts = '';
+  for (let y = 2026; y <= 2035; y++) {
+    yearOpts += `<option value="${y}" ${y===nextYear?'selected':''}>${y}</option>`;
+  }
+  
+  let monthOpts = '';
+  MONTH_NAMES.forEach((m, i) => {
+    monthOpts += `<option value="${i}" ${i===nextMonth?'selected':''}>${m}</option>`;
+  });
+  
+  // Listar períodos existentes
+  let listHtml = '<div style="max-height:200px;overflow-y:auto">';
+  PERIODS.forEach(p => {
+    const isDefault = DEFAULT_PERIODS.find(dp => dp.id === p.id);
+    const removeBtn = isDefault ? '<span style="color:#999;font-size:10px">padrão</span>' : '<button onclick="removePeriod(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:12px">🗑️</button>';
+    listHtml += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #f0f0f0;font-size:12px">';
+    listHtml += '<span>📅 <strong>' + p.label + '</strong> — ' + p.start.slice(8)+'/'+p.start.slice(5,7) + ' a ' + p.end.slice(8)+'/'+p.end.slice(5,7) + '</span>';
+    listHtml += removeBtn;
+    listHtml += '</div>';
+  });
+  listHtml += '</div>';
+  
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:460px">
+      <h3>📅 Gerenciar Períodos</h3>
+      <div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;margin-bottom:16px">${listHtml}</div>
+      <div style="background:#f5f5f5;border-radius:8px;padding:14px">
+        <h4 style="margin:0 0 10px;font-size:13px;color:#0467FC">+ Criar Novo Período</h4>
+        <p style="font-size:11px;color:#666;margin-bottom:10px">O período será automaticamente de 11 do mês selecionado até 10 do mês seguinte.</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="newPeriodMonth" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:12px">${monthOpts}</select>
+          <select id="newPeriodYear" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:12px">${yearOpts}</select>
+          <button onclick="addNewPeriod()" style="padding:8px 16px;background:#0467FC;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px">Criar</button>
+        </div>
+      </div>
+      <div class="btns" style="margin-top:12px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
+    </div></div>`;
+}
+
+function addNewPeriod() {
+  const month = parseInt(document.getElementById('newPeriodMonth').value);
+  const year = parseInt(document.getElementById('newPeriodYear').value);
+  
+  const monthStr = String(month + 1).padStart(2, '0');
+  const nextMonth = month === 11 ? 0 : month + 1;
+  const nextYear = month === 11 ? year + 1 : year;
+  const nextMonthStr = String(nextMonth + 1).padStart(2, '0');
+  
+  const id = MONTH_NAMES[month].toLowerCase() + String(year).slice(2);
+  const label = MONTH_NAMES[month] + '/' + year;
+  const start = year + '-' + monthStr + '-11';
+  const end = nextYear + '-' + nextMonthStr + '-10';
+  
+  // Verificar se já existe
+  if (PERIODS.find(p => p.id === id)) {
+    showToast('Este período já existe!', 'error');
+    return;
+  }
+  
+  const newPeriod = {id, label, start, end};
+  PERIODS.push(newPeriod);
+  PERIODS.sort((a,b) => a.start.localeCompare(b.start));
+  
+  // Salvar no localStorage
+  const extras = PERIODS.filter(p => !DEFAULT_PERIODS.find(dp => dp.id === p.id));
+  try { localStorage.setItem('kavak_periods', JSON.stringify(extras)); } catch(e) {}
+  
+  showToast('📅 Período ' + label + ' criado!', 'success');
+  openNewPeriod(); // Refresh modal
+  renderApp();
+}
+
+function removePeriod(id) {
+  // Não permitir remover períodos padrão
+  if (DEFAULT_PERIODS.find(p => p.id === id)) {
+    showToast('Não é possível remover períodos padrão', 'error');
+    return;
+  }
+  PERIODS = PERIODS.filter(p => p.id !== id);
+  const extras = PERIODS.filter(p => !DEFAULT_PERIODS.find(dp => dp.id === p.id));
+  try { localStorage.setItem('kavak_periods', JSON.stringify(extras)); } catch(e) {}
+  showToast('Período removido', 'info');
+  openNewPeriod();
+  renderApp();
 }
 
 // ========== FERIADOS ==========
