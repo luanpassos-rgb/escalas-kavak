@@ -239,6 +239,7 @@ input,select,button,textarea { font-family:inherit; }
         <span id="badgeCrit" class="badge badge-crit">⛔ 0 críticos</span>
         <span id="badgeWarn" class="badge badge-warn">⚠️ 0 alertas</span>
         <button id="btnNotif" class="btn-notif hidden" onclick="toggleNotif()">🔔 Notificações<span id="notifCount" class="count hidden">0</span></button>
+        <button id="btnSound" class="btn-notif hidden" onclick="toggleSound()" title="Ativar/desativar som de notificação" style="padding:5px 10px"><span id="soundIcon">🔊</span></button>
         <div class="user-info">
           <span id="userName"></span>
           <button class="btn-sm" onclick="openChangePass()">🔑</button>
@@ -726,6 +727,7 @@ function doLogin() {
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('loginError').classList.add('hidden');
     renderApp();
+    startPolling();
   } else {
     document.getElementById('loginError').textContent = 'Usuário ou senha inválidos';
     document.getElementById('loginError').classList.remove('hidden');
@@ -733,6 +735,7 @@ function doLogin() {
 }
 
 function doLogout() {
+  stopPolling();
   loggedUser = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
@@ -790,6 +793,8 @@ function renderApp() {
   const userIcon = loggedUser.role === 'admin' ? '👑' : (isRH ? '🛡️' : '👤');
   document.getElementById('userName').textContent = userIcon + ' ' + loggedUser.nome + (loggedUser.role === 'admin' ? ' (Admin)' : loggedUser.role === 'rh' ? ' (DP)' : '');
   document.getElementById('btnNotif').classList.toggle('hidden', !isRH);
+  document.getElementById('btnSound').classList.toggle('hidden', !isRH);
+  document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
 
   // Period label
   document.getElementById('periodLabel').textContent = 'Efetividade: ' + per.label;
@@ -2662,6 +2667,125 @@ function togglePeriodLock() {
     showToast('🔓 Período ' + per.label + ' LIBERADO. Gestores podem preencher.', 'success');
   }
   renderApp();
+}
+
+// ========== POLLING (atualização em tempo real) ==========
+let pollingInterval = null;
+let lastNotifId = 0;
+let lastEscalaUpdate = null;
+let soundEnabled = true;
+
+function loadSoundPreference() {
+  try {
+    const pref = localStorage.getItem('kavak_sound_enabled');
+    if (pref !== null) soundEnabled = pref === 'true';
+  } catch(e) {}
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  try { localStorage.setItem('kavak_sound_enabled', soundEnabled); } catch(e) {}
+  showToast(soundEnabled ? '🔊 Som ativado' : '🔇 Som desativado', 'info');
+  renderApp();
+}
+
+function playNotificationSound() {
+  if (!soundEnabled) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 800;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch(e) { console.log('Audio not supported'); }
+}
+
+function startPolling() {
+  loadSoundPreference();
+  if (pollingInterval) clearInterval(pollingInterval);
+  // Inicializar lastNotifId com o maior id atual para não tocar som para notificações antigas
+  if (NOTIFS && NOTIFS.length > 0) {
+    lastNotifId = Math.max(...NOTIFS.map(n => n.id || 0));
+  }
+  pollingInterval = setInterval(pollUpdates, 30000); // 30 segundos
+}
+
+function stopPolling() {
+  if (pollingInterval) clearInterval(pollingInterval);
+  pollingInterval = null;
+  lastNotifId = 0;
+}
+
+async function pollUpdates() {
+  if (!loggedUser || sbOnline === false) return;
+  
+  try {
+    const isRH = loggedUser.role === 'rh' || loggedUser.role === 'admin';
+    
+    // 1. Polling de notificações (só para RH/Admin)
+    if (isRH) {
+      const newNotifs = await sbFetch('notificacoes?select=*&order=id.desc&limit=20');
+      if (newNotifs && newNotifs.length > 0) {
+        const maxId = Math.max(...newNotifs.map(n => n.id));
+        if (maxId > lastNotifId && lastNotifId > 0) {
+          // Tem notificação nova! Atualizar lista e tocar som
+          const newOnes = newNotifs.filter(n => n.id > lastNotifId);
+          // Adicionar no topo da lista local
+          newOnes.reverse().forEach(n => NOTIFS.unshift(n));
+          // Tocar som
+          playNotificationSound();
+          // Re-renderizar para atualizar o badge
+          renderApp();
+          showToast('🔔 ' + newOnes.length + ' nova(s) notificação(ões)', 'info');
+        }
+        lastNotifId = maxId;
+      }
+    }
+    
+    // 2. Polling de escalas (atualização da grade)
+    const escalas = await sbFetch('escalas?select=*&order=atualizado_em.desc&limit=200');
+    if (escalas && escalas.length > 0) {
+      const maxUpdate = escalas[0].atualizado_em;
+      if (lastEscalaUpdate && maxUpdate > lastEscalaUpdate) {
+        // Houve mudanças, recarregar escalas
+        escalas.forEach(e => {
+          const key = e.periodo + '_' + e.funcionario_id;
+          if (!ESCALAS[key]) ESCALAS[key] = Array(35).fill('');
+          if (e.dia !== null && e.dia !== undefined && e.status) {
+            ESCALAS[key][e.dia] = e.status;
+          }
+        });
+        // Re-renderizar apenas a grade (mantendo scroll)
+        const gridScroll = document.querySelector('.grid-scroll');
+        const savedLeft = gridScroll ? gridScroll.scrollLeft : 0;
+        const savedTop = gridScroll ? gridScroll.scrollTop : 0;
+        renderApp();
+        requestAnimationFrame(() => {
+          const gs = document.querySelector('.grid-scroll');
+          if (gs) { gs.scrollLeft = savedLeft; gs.scrollTop = savedTop; }
+        });
+      }
+      lastEscalaUpdate = maxUpdate;
+    }
+    
+    // 3. Polling de validações (para o banner verde aparecer no RH)
+    const vals = await sbFetch('validacoes?select=*');
+    if (vals && vals.length > 0) {
+      VALIDACOES = {};
+      vals.forEach(v => {
+        VALIDACOES[v.periodo + '_' + v.gestor_nome] = { ts: v.data_hora, gestor: v.gestor_nome, periodo: v.periodo };
+      });
+    }
+  } catch(e) {
+    console.log('Polling error:', e);
+  }
 }
 
 // ========== EMAIL NOTIFICATION ==========
