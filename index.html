@@ -240,6 +240,7 @@ input,select,button,textarea { font-family:inherit; }
         <span id="badgeWarn" class="badge badge-warn">⚠️ 0 alertas</span>
         <button id="btnNotif" class="btn-notif hidden" onclick="toggleNotif()">🔔 Notificações<span id="notifCount" class="count hidden">0</span></button>
         <button id="btnSound" class="btn-notif hidden" onclick="toggleSound()" title="Ativar/desativar som de notificação" style="padding:5px 10px"><span id="soundIcon">🔊</span></button>
+        <span id="lastUpdateBadge" class="hidden" style="font-size:11px;color:rgba(255,255,255,.85);padding:5px 10px;background:rgba(255,255,255,.1);border-radius:14px;display:flex;align-items:center;gap:4px" title="Última verificação automática do sistema">🔄 <span id="lastUpdateText">—</span></span>
         <div class="user-info">
           <span id="userName"></span>
           <button class="btn-sm" onclick="openChangePass()">🔑</button>
@@ -798,6 +799,7 @@ function renderApp() {
   document.getElementById('btnNotif').classList.toggle('hidden', !isRH);
   document.getElementById('btnSound').classList.toggle('hidden', !isRH);
   document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+  document.getElementById('lastUpdateBadge').classList.remove('hidden');
 
   // Period label
   document.getElementById('periodLabel').textContent = 'Efetividade: ' + per.label;
@@ -920,7 +922,7 @@ function renderApp() {
   });
 
   // Notif count
-  const unread = NOTIFS.filter(n => !n.lida).length;
+  const unread = NOTIFS.filter(n => !n.lida && (!n.tipo || !n.tipo.startsWith('config_'))).length;
   const nc = document.getElementById('notifCount');
   if (unread > 0) { nc.textContent = unread; nc.classList.remove('hidden'); }
   else nc.classList.add('hidden');
@@ -1676,14 +1678,16 @@ document.addEventListener('click', e => {
 function toggleNotif() {
   const panel = document.getElementById('notifPanel');
   if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
-  const unread = NOTIFS.filter(n => !n.lida).length;
+  // Filtrar notificações técnicas (de configuração)
+  const realNotifs = NOTIFS.filter(n => !n.tipo || !n.tipo.startsWith('config_'));
+  const unread = realNotifs.filter(n => !n.lida).length;
   let html = `<div class="notif-header"><span style="font-weight:700;font-size:14px">🔔 Notificações</span><div style="display:flex;gap:8px">`;
   if (unread > 0) html += `<button class="btn-sm" onclick="markAllRead()">Marcar lidas</button>`;
   html += `<button class="btn-sm" onclick="document.getElementById('notifPanel').classList.add('hidden')">✕</button></div></div>`;
-  if (!NOTIFS.length) {
+  if (!realNotifs.length) {
     html += '<div style="padding:30px;text-align:center;color:#999;font-size:13px">Nenhuma notificação</div>';
   } else {
-    NOTIFS.slice(0,50).forEach(n => {
+    realNotifs.slice(0,50).forEach(n => {
       const ts = n.ts ? new Date(n.ts).toLocaleString('pt-BR') : (n.created_at ? new Date(n.created_at).toLocaleString('pt-BR') : '');
       html += `<div class="notif-item ${n.lida?'':'unread'}"><div style="font-size:12px;font-weight:${n.lida?400:600}">${n.msg||n.mensagem||''}</div><div style="font-size:10px;color:#999;margin-top:4px">${ts}</div></div>`;
     });
@@ -2115,32 +2119,45 @@ async function resetUserPass(usuario) {
 // ========== TRANSFER ALL ==========
 // ========== TIPO DE ESCALA POR GESTOR ==========
 function openTipoEscala() {
-  let listHtml = '';
-  GESTORES.forEach(g => {
+  let rowsHtml = '';
+  GESTORES.forEach((g, i) => {
     const tipoAtual = GESTOR_ESCALA[g.nome] || '6x1';
     const qtdFuncs = FUNCS.filter(f => f.gestor_id === g.id).length;
-    listHtml += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #f0f0f0">
-      <div style="flex:1">
-        <div style="font-weight:600;font-size:13px">${g.nome}</div>
-        <div style="font-size:11px;color:#666">${qtdFuncs} funcionário(s)</div>
-      </div>
-      <select onchange="setTipoEscala('${g.nome.replace(/'/g,"\\\\'")}', this.value)" style="padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-weight:600">
-        <option value="6x1" ${tipoAtual==='6x1'?'selected':''}>📋 6x1</option>
-        <option value="espanhola" ${tipoAtual==='espanhola'?'selected':''}>🔄 Espanhola</option>
-      </select>
-    </div>`;
+    const bgColor = i % 2 === 0 ? '#fff' : '#fafafa';
+    rowsHtml += `<tr style="background:${bgColor};border-bottom:1px solid #f0f0f0">
+      <td style="padding:12px 16px;vertical-align:middle">
+        <div style="font-weight:700;font-size:13px;color:#02347E">${g.nome}</div>
+        <div style="font-size:11px;color:#666;margin-top:2px">${qtdFuncs} funcionário${qtdFuncs>1?'s':''}</div>
+      </td>
+      <td style="padding:12px 16px;vertical-align:middle;text-align:right">
+        <select onchange="setTipoEscala('${g.nome.replace(/'/g,"\\\\'")}', this.value)" style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;min-width:170px;font-family:inherit;background:#fff">
+          <option value="6x1" ${tipoAtual==='6x1'?'selected':''}>📋 6x1</option>
+          <option value="espanhola" ${tipoAtual==='espanhola'?'selected':''}>🔄 Espanhola</option>
+        </select>
+      </td>
+    </tr>`;
   });
 
   document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
-    <div class="modal" style="width:520px">
+    <div class="modal" style="width:600px">
       <h3>📋 Tipo de Escala por Gestor</h3>
-      <p style="font-size:12px;color:#666;margin-bottom:12px">Marque o tipo de escala que cada gestor opera. Esta informação aparece como tooltip no cabeçalho do gestor na grade.</p>
+      <p style="font-size:12px;color:#666;margin-bottom:12px">Marque o tipo de escala que cada gestor opera.</p>
       <div style="background:#EBF1FF;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:#02347E">
         <div><strong>📋 6x1:</strong> Trabalha 6 dias e folga 1 (DSR em dias alternados)</div>
         <div style="margin-top:4px"><strong>🔄 Espanhola:</strong> Funcionários se revezam aos sábados (1 trabalha, outro folga)</div>
       </div>
-      <div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;max-height:400px;overflow-y:auto">${listHtml}</div>
-      <div class="btns" style="margin-top:12px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
+      <div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;max-height:420px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:#02347E;color:white">
+              <th style="padding:10px 16px;text-align:left;font-weight:600;font-size:12px">Gestor</th>
+              <th style="padding:10px 16px;text-align:right;font-weight:600;font-size:12px">Tipo de Escala</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div class="btns" style="margin-top:14px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
     </div></div>`;
 }
 
@@ -2759,10 +2776,16 @@ function playNotificationSound() {
 function startPolling() {
   loadSoundPreference();
   if (pollingInterval) clearInterval(pollingInterval);
-  // Inicializar lastNotifId com o maior id atual para não tocar som para notificações antigas
   if (NOTIFS && NOTIFS.length > 0) {
     lastNotifId = Math.max(...NOTIFS.map(n => n.id || 0));
   }
+  // Inicializar badge
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const ss = String(now.getSeconds()).padStart(2,'0');
+  const badge = document.getElementById('lastUpdateText');
+  if (badge) badge.textContent = 'Atualizado ' + hh + ':' + mm + ':' + ss;
   pollingInterval = setInterval(pollUpdates, 30000); // 30 segundos
 }
 
@@ -2770,6 +2793,8 @@ function stopPolling() {
   if (pollingInterval) clearInterval(pollingInterval);
   pollingInterval = null;
   lastNotifId = 0;
+  const badge = document.getElementById('lastUpdateBadge');
+  if (badge) badge.classList.add('hidden');
 }
 
 async function pollUpdates() {
@@ -2777,22 +2802,24 @@ async function pollUpdates() {
   
   try {
     const isRH = loggedUser.role === 'rh' || loggedUser.role === 'admin';
-    
     // 1. Polling de notificações (só para RH/Admin)
     if (isRH) {
       const newNotifs = await sbFetch('notificacoes?select=*&order=id.desc&limit=20');
       if (newNotifs && newNotifs.length > 0) {
         const maxId = Math.max(...newNotifs.map(n => n.id));
         if (maxId > lastNotifId && lastNotifId > 0) {
-          // Tem notificação nova! Atualizar lista e tocar som
           const newOnes = newNotifs.filter(n => n.id > lastNotifId);
-          // Adicionar no topo da lista local
+          // Filtrar notificações técnicas (config_*)
+          const realNew = newOnes.filter(n => !n.tipo || !n.tipo.startsWith('config_'));
+          // Adicionar TODAS no array local (técnicas + reais), mas só notificar/som para as reais
           newOnes.reverse().forEach(n => NOTIFS.unshift(n));
-          // Tocar som
-          playNotificationSound();
-          // Re-renderizar para atualizar o badge
-          renderApp();
-          showToast('🔔 ' + newOnes.length + ' nova(s) notificação(ões)', 'info');
+          if (realNew.length > 0) {
+            playNotificationSound();
+            renderApp();
+            showToast('🔔 ' + realNew.length + ' nova(s) notificação(ões)', 'info');
+          } else {
+            renderApp(); // atualizar mesmo sem som
+          }
         }
         lastNotifId = maxId;
       }
@@ -2832,6 +2859,14 @@ async function pollUpdates() {
         VALIDACOES[v.periodo + '_' + v.gestor] = { ts: v.validado_em, gestor: v.gestor, periodo: v.periodo };
       });
     }
+    
+    // Atualizar badge de última atualização
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    const ss = String(now.getSeconds()).padStart(2,'0');
+    const badge = document.getElementById('lastUpdateText');
+    if (badge) badge.textContent = 'Atualizado ' + hh + ':' + mm + ':' + ss;
   } catch(e) {
     console.log('Polling error:', e);
   }
