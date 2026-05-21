@@ -560,7 +560,7 @@ async function loadData() {
     let vals = await sbFetch('validacoes?select=*');
     if (vals && vals.length > 0) {
       vals.forEach(v => {
-        VALIDACOES[v.periodo + '_' + v.gestor_nome] = { ts: v.data_hora, gestor: v.gestor_nome, periodo: v.periodo };
+        VALIDACOES[v.periodo + '_' + v.gestor] = { ts: v.validado_em, gestor: v.gestor, periodo: v.periodo };
       });
     }
 
@@ -1544,9 +1544,9 @@ function doValidate() {
   // Save
   sbFetch('validacoes', 'POST', {
     periodo: currentPeriod,
-    gestor_nome: loggedUser.gestor_nome,
-    data_hora: nowStr(),
-    alertas_pendentes: 0
+    gestor: loggedUser.gestor_nome,
+    validado_em: nowStr(),
+    alertas: 0
   });
 
   const logE = { usuario: getLogName(), acao: 'validou_escala', funcionario_nome: '—', dia: per.label, valor_anterior: '—', valor_novo: 'Validado', pos_validacao: false };
@@ -1610,7 +1610,8 @@ async function saveNotif(notif) {
   await sbFetch('notificacoes', 'POST', {
     tipo: notif.tipo,
     msg: notif.mensagem || notif.msg,
-    lida: false
+    lida: false,
+    ts: new Date().toISOString()
   });
 }
 
@@ -2780,7 +2781,7 @@ async function pollUpdates() {
     if (vals && vals.length > 0) {
       VALIDACOES = {};
       vals.forEach(v => {
-        VALIDACOES[v.periodo + '_' + v.gestor_nome] = { ts: v.data_hora, gestor: v.gestor_nome, periodo: v.periodo };
+        VALIDACOES[v.periodo + '_' + v.gestor] = { ts: v.validado_em, gestor: v.gestor, periodo: v.periodo };
       });
     }
   } catch(e) {
