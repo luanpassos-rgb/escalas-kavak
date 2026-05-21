@@ -365,6 +365,7 @@ let ESCALAS = {};
 let VALIDACOES = {};
 let LOGS_DATA = [];
 let NOTIFS = [];
+let GESTOR_ESCALA = {}; // {gestorNome: "6x1" | "espanhola"}
 let FERIADOS = {}; // {periodo: [{data_idx, descricao}]}
 let FERIAS = {};   // {"periodo_funcId": [dia_idx, dia_idx, ...]}
 let PERIOD_LOCKS = {}; // {periodo: true/false}
@@ -588,6 +589,8 @@ async function loadData() {
     if (feData) FERIAS = JSON.parse(feData);
     const plData = localStorage.getItem('kavak_locks');
     if (plData) PERIOD_LOCKS = JSON.parse(plData);
+    const escData = localStorage.getItem('kavak_gestor_escala');
+    if (escData) GESTOR_ESCALA = JSON.parse(escData);
   } catch(e) {}
 }
 
@@ -885,6 +888,7 @@ function renderApp() {
         <button class="dropdown-item" onclick="closeActionsMenu();autoFillAll()"><span style="font-size:14px">⚡</span> 6x1 Todos</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openExport()"><span style="font-size:14px">📊</span> Exportar Relatórios</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openTransferAll()"><span style="font-size:14px">🔄</span> Transferir Equipe</button>
+        <button class="dropdown-item" onclick="closeActionsMenu();openTipoEscala()"><span style="font-size:14px">📋</span> Tipo de Escala por Gestor</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openNewPeriod()" style="border-top:2px solid #eee"><span style="font-size:14px">📅</span> Novo Período</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openFeriados()"><span style="font-size:14px">📌</span> Feriados</button>
         <button class="dropdown-item" onclick="closeActionsMenu();openFerias()"><span style="font-size:14px">🌴</span> Férias</button>
@@ -1068,7 +1072,13 @@ function renderGrid(funcs, dates, allAlerts) {
     if (f.gestor_nome !== lastGestor) {
       lastGestor = f.gestor_nome;
       nn = 0;
-      html += `<tr class="dept-row"><td colspan="${5+numDays+1}">📂 ${f.dept_nome} — 👤 ${f.gestor_nome}</td></tr>`;
+      const tipoEsc = GESTOR_ESCALA[f.gestor_nome] || '6x1';
+      const tipoLabel = tipoEsc === 'espanhola' ? 'Espanhola' : '6x1';
+      const tipoDesc = tipoEsc === 'espanhola' 
+        ? 'Tipo de escala: Espanhola - Funcionários se revezam aos sábados (1 trabalha, outro folga)'
+        : 'Tipo de escala: 6x1 - Trabalha 6 dias e folga 1 (DSR em dias alternados)';
+      const tipoIcon = tipoEsc === 'espanhola' ? '🔄' : '📋';
+      html += `<tr class="dept-row"><td colspan="${5+numDays+1}">📂 ${f.dept_nome} — 👤 <span title="${tipoDesc}" style="cursor:help;border-bottom:1px dotted rgba(255,255,255,.5)">${f.gestor_nome}</span> <span title="${tipoDesc}" style="cursor:help;font-size:11px;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px;margin-left:6px">${tipoIcon} ${tipoLabel}</span></td></tr>`;
     }
     nn++;
     const key = currentPeriod + '_' + f.id;
@@ -2103,6 +2113,44 @@ async function resetUserPass(usuario) {
 
 // ========== EXPORT ==========
 // ========== TRANSFER ALL ==========
+// ========== TIPO DE ESCALA POR GESTOR ==========
+function openTipoEscala() {
+  let listHtml = '';
+  GESTORES.forEach(g => {
+    const tipoAtual = GESTOR_ESCALA[g.nome] || '6x1';
+    const qtdFuncs = FUNCS.filter(f => f.gestor_id === g.id).length;
+    listHtml += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #f0f0f0">
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${g.nome}</div>
+        <div style="font-size:11px;color:#666">${qtdFuncs} funcionário(s)</div>
+      </div>
+      <select onchange="setTipoEscala('${g.nome.replace(/'/g,"\\\\'")}', this.value)" style="padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:12px;font-weight:600">
+        <option value="6x1" ${tipoAtual==='6x1'?'selected':''}>📋 6x1</option>
+        <option value="espanhola" ${tipoAtual==='espanhola'?'selected':''}>🔄 Espanhola</option>
+      </select>
+    </div>`;
+  });
+
+  document.getElementById('modalArea').innerHTML = `<div class="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="width:520px">
+      <h3>📋 Tipo de Escala por Gestor</h3>
+      <p style="font-size:12px;color:#666;margin-bottom:12px">Marque o tipo de escala que cada gestor opera. Esta informação aparece como tooltip no cabeçalho do gestor na grade.</p>
+      <div style="background:#EBF1FF;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:#02347E">
+        <div><strong>📋 6x1:</strong> Trabalha 6 dias e folga 1 (DSR em dias alternados)</div>
+        <div style="margin-top:4px"><strong>🔄 Espanhola:</strong> Funcionários se revezam aos sábados (1 trabalha, outro folga)</div>
+      </div>
+      <div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;max-height:400px;overflow-y:auto">${listHtml}</div>
+      <div class="btns" style="margin-top:12px"><button class="btn-cancel" onclick="closeModal()">Fechar</button></div>
+    </div></div>`;
+}
+
+function setTipoEscala(gestorNome, tipo) {
+  GESTOR_ESCALA[gestorNome] = tipo;
+  try { localStorage.setItem('kavak_gestor_escala', JSON.stringify(GESTOR_ESCALA)); } catch(e) {}
+  showToast('✅ Tipo de escala atualizado para ' + gestorNome, 'success');
+  renderApp();
+}
+
 function openTransferAll() {
   let gestorOpts = '';
   GESTORES.forEach(g => {
