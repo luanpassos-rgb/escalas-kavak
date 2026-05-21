@@ -1078,7 +1078,7 @@ function renderGrid(funcs, dates, allAlerts) {
         ? 'Tipo de escala: Espanhola - Funcionários se revezam aos sábados (1 trabalha, outro folga)'
         : 'Tipo de escala: 6x1 - Trabalha 6 dias e folga 1 (DSR em dias alternados)';
       const tipoIcon = tipoEsc === 'espanhola' ? '🔄' : '📋';
-      html += `<tr class="dept-row"><td colspan="${5+numDays+1}">📂 ${f.dept_nome} — 👤 <span title="${tipoDesc}" style="cursor:help;border-bottom:1px dotted rgba(255,255,255,.5)">${f.gestor_nome}</span> <span title="${tipoDesc}" style="cursor:help;font-size:11px;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px;margin-left:6px">${tipoIcon} ${tipoLabel}</span></td></tr>`;
+      html += `<tr class="dept-row"><td colspan="${5+numDays+1}">📂 ${f.dept_nome} — 👤 <span title="${tipoDesc}" style="cursor:help;border-bottom:1px dotted rgba(255,255,255,.5)">${f.gestor_nome}</span> <span title="${tipoDesc}" style="cursor:help;font-size:11px;background:#fbbf24;color:#7c2d12;padding:2px 10px;border-radius:10px;margin-left:8px;font-weight:700">${tipoIcon} ${tipoLabel}</span></td></tr>`;
     }
     nn++;
     const key = currentPeriod + '_' + f.id;
