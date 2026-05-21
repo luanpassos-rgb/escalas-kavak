@@ -1604,7 +1604,7 @@ async function saveNotif(notif) {
   if (sbOnline === false) return;
   await sbFetch('notificacoes', 'POST', {
     tipo: notif.tipo,
-    mensagem: notif.mensagem,
+    msg: notif.mensagem || notif.msg,
     lida: false
   });
 }
@@ -1669,7 +1669,7 @@ function toggleNotif() {
   } else {
     NOTIFS.slice(0,50).forEach(n => {
       const ts = n.ts ? new Date(n.ts).toLocaleString('pt-BR') : (n.created_at ? new Date(n.created_at).toLocaleString('pt-BR') : '');
-      html += `<div class="notif-item ${n.lida?'':'unread'}"><div style="font-size:12px;font-weight:${n.lida?400:600}">${n.mensagem||''}</div><div style="font-size:10px;color:#999;margin-top:4px">${ts}</div></div>`;
+      html += `<div class="notif-item ${n.lida?'':'unread'}"><div style="font-size:12px;font-weight:${n.lida?400:600}">${n.msg||n.mensagem||''}</div><div style="font-size:10px;color:#999;margin-top:4px">${ts}</div></div>`;
     });
   }
   panel.innerHTML = html;
@@ -2450,7 +2450,7 @@ function removePeriod(id) {
 function saveFeriados() {
   try { localStorage.setItem('kavak_feriados', JSON.stringify(FERIADOS)); } catch(e) {}
   // Salvar no Supabase também
-  if (sbOnline !== false) sbFetch('notificacoes', 'POST', {tipo:'config_feriados', mensagem: JSON.stringify(FERIADOS), lida:true});
+  if (sbOnline !== false) sbFetch('notificacoes', 'POST', {tipo:'config_feriados', msg: JSON.stringify(FERIADOS), lida:true});
 }
 
 function getFeriadosForPeriod() {
@@ -2540,7 +2540,7 @@ function removeFeriado(i) {
 // ========== FÉRIAS ==========
 function saveFerias() {
   try { localStorage.setItem('kavak_ferias', JSON.stringify(FERIAS)); } catch(e) {}
-  if (sbOnline !== false) sbFetch('notificacoes', 'POST', {tipo:'config_ferias', mensagem: JSON.stringify(FERIAS), lida:true});
+  if (sbOnline !== false) sbFetch('notificacoes', 'POST', {tipo:'config_ferias', msg: JSON.stringify(FERIAS), lida:true});
 }
 
 function isFerias(funcId, dayIdx) {
@@ -2643,7 +2643,7 @@ function removeFerias(funcId) {
 // ========== TRAVA DE PERÍODO ==========
 function savePeriodLocks() {
   try { localStorage.setItem('kavak_locks', JSON.stringify(PERIOD_LOCKS)); } catch(e) {}
-  if (sbOnline !== false) sbFetch('notificacoes', 'POST', {tipo:'config_locks', mensagem: JSON.stringify(PERIOD_LOCKS), lida:true});
+  if (sbOnline !== false) sbFetch('notificacoes', 'POST', {tipo:'config_locks', msg: JSON.stringify(PERIOD_LOCKS), lida:true});
 }
 
 function isPeriodLocked() {
@@ -2705,7 +2705,7 @@ async function sendEmailToRH(subject, message) {
   // Sempre salvar como notificação no Supabase
   const notifEmail = {
     tipo: 'email_rh',
-    mensagem: '📧 ' + message,
+    msg: '📧 ' + message,
     lida: false
   };
   saveNotif(notifEmail);
