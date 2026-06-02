@@ -240,7 +240,7 @@ input,select,button,textarea { font-family:inherit; }
         <span id="badgeWarn" class="badge badge-warn">⚠️ 0 alertas</span>
         <button id="btnNotif" class="btn-notif hidden" onclick="toggleNotif()">🔔 Notificações<span id="notifCount" class="count hidden">0</span></button>
         <button id="btnSound" class="btn-notif hidden" onclick="toggleSound()" title="Ativar/desativar som de notificação" style="padding:5px 10px"><span id="soundIcon">🔊</span></button>
-        <span id="lastUpdateBadge" class="hidden" style="font-size:11px;color:rgba(255,255,255,.85);padding:5px 10px;background:rgba(255,255,255,.1);border-radius:14px;display:flex;align-items:center;gap:4px" title="Última verificação automática do sistema">🔄 <span id="lastUpdateText">—</span></span>
+        <button id="lastUpdateBadge" class="hidden" onclick="manualRefresh()" style="font-size:11px;color:rgba(255,255,255,.95);padding:5px 12px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:14px;display:flex;align-items:center;gap:5px;cursor:pointer;font-family:inherit" title="Clique para atualizar manualmente"><span id="refreshIcon">🔄</span> <span id="lastUpdateText">—</span></button>
         <div class="user-info">
           <span id="userName"></span>
           <button class="btn-sm" onclick="openChangePass()">🔑</button>
@@ -1471,7 +1471,7 @@ function closeCellPicker() {
 }
 
 // ========== AUTO FILL 6x1 ==========
-function autoFill(funcId) {
+async function autoFill(funcId) {
   const per = PERIODS.find(p => p.id === currentPeriod);
   const dates = genDates(per.start, per.end);
   const numDays = dates.length;
@@ -1482,7 +1482,6 @@ function autoFill(funcId) {
   }
   
   ESCALAS[currentPeriod + '_' + funcId] = sch;
-  saveEscala(funcId, currentPeriod, sch);
   
   const gridScroll = document.querySelector('.grid-scroll');
   const savedScrollLeft = gridScroll ? gridScroll.scrollLeft : 0;
@@ -1493,9 +1492,16 @@ function autoFill(funcId) {
     if (gs) gs.scrollLeft = savedScrollLeft;
     window.scrollTo(0, savedScrollTop);
   });
+  
+  const ok = await saveEscala(funcId, currentPeriod, sch);
+  if (!ok && sbOnline !== false) {
+    showToast('❌ Erro ao salvar. Clique no botão 6x1 novamente.', 'error');
+  }
 }
 
-function autoFillAll() {
+let _autoFillAllRunning = false;
+async function autoFillAll() {
+  if (_autoFillAllRunning) { showToast('Aguarde, processando...', 'warning'); return; }
   const per = PERIODS.find(p => p.id === currentPeriod);
   const dates = genDates(per.start, per.end);
   const numDays = dates.length;
@@ -1503,19 +1509,21 @@ function autoFillAll() {
   
   if (funcs.length === 0) { showToast('Nenhum funcionário visível para preencher.', 'error'); return; }
   
+  if (!confirm(`Aplicar 6x1 padrão para ${funcs.length} funcionário(s)?\n\nIsso vai sobrescrever qualquer escala existente nesses funcionários no período ${per.label}.`)) return;
+  
+  _autoFillAllRunning = true;
+  showToast(`⏳ Processando ${funcs.length} funcionário(s)...`, 'info');
+  
   const baseSch = Array(numDays).fill('');
   for (let i = 0; i < numDays; i++) {
     baseSch[i] = dates[i].getDay() === 0 ? 'DSR' : 'T';
   }
   
+  // Atualiza estado local primeiro (todos)
   funcs.forEach(f => {
-    const sch = baseSch.slice();
-    ESCALAS[currentPeriod + '_' + f.id] = sch;
-    saveEscala(f.id, currentPeriod, sch);
+    ESCALAS[currentPeriod + '_' + f.id] = baseSch.slice();
   });
-  
-  showToast('✅ 6x1 aplicado para ' + funcs.length + ' funcionários!', 'success');
-  
+  // Re-render imediato pra UX
   const gridScroll = document.querySelector('.grid-scroll');
   const savedScrollLeft = gridScroll ? gridScroll.scrollLeft : 0;
   const savedScrollTop = window.scrollY;
@@ -1525,6 +1533,42 @@ function autoFillAll() {
     if (gs) gs.scrollLeft = savedScrollLeft;
     window.scrollTo(0, savedScrollTop);
   });
+  
+  // Salva no DB em lotes de 5 para não estourar rate limit
+  const BATCH = 5;
+  let okCount = 0;
+  const failed = [];
+  for (let i = 0; i < funcs.length; i += BATCH) {
+    const batch = funcs.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(f => saveEscala(f.id, currentPeriod, baseSch.slice())));
+    results.forEach((ok, idx) => {
+      if (ok) okCount++;
+      else failed.push(batch[idx]);
+    });
+    // pequena pausa entre lotes pra não saturar
+    if (i + BATCH < funcs.length) await new Promise(r => setTimeout(r, 150));
+  }
+  
+  // Retry final dos que falharam (1 a 1, mais devagar)
+  if (failed.length > 0) {
+    showToast(`⚠️ Re-tentando ${failed.length} funcionário(s) que falharam...`, 'warning');
+    const stillFailed = [];
+    for (const f of failed) {
+      const ok = await saveEscala(f.id, currentPeriod, baseSch.slice());
+      if (ok) okCount++;
+      else stillFailed.push(f);
+      await new Promise(r => setTimeout(r, 200));
+    }
+    if (stillFailed.length > 0) {
+      const nomes = stillFailed.slice(0, 5).map(f => f.nome).join(', ') + (stillFailed.length > 5 ? '...' : '');
+      showToast(`❌ Falha ao salvar ${stillFailed.length} funcionário(s): ${nomes}. Clique em "6x1 Todos" novamente para tentar os restantes.`, 'error');
+      _autoFillAllRunning = false;
+      return;
+    }
+  }
+  
+  _autoFillAllRunning = false;
+  showToast(`✅ 6x1 aplicado e salvo para ${okCount} funcionário(s)!`, 'success');
 }
 
 // ========== VALIDATE ==========
@@ -1578,19 +1622,43 @@ function doValidate() {
 }
 
 // ========== SAVE HELPERS ==========
-async function saveEscala(funcId, periodo, valores) {
-  if (sbOnline === false) return;
-  // Delete existing entries for this func+period
-  await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}`, 'DELETE');
-  // Insert each day as a separate row
-  const rows = [];
-  for (let i = 0; i < valores.length; i++) {
-    if (valores[i]) {
-      rows.push({ funcionario_id: funcId, periodo: periodo, dia: i, status: valores[i], atualizado_por: loggedUser ? getLogName() : '' });
+async function saveEscala(funcId, periodo, valores, retries = 2) {
+  if (sbOnline === false) return false;
+  try {
+    // Delete existing entries for this func+period
+    const delResult = await sbFetch(`escalas?funcionario_id=eq.${funcId}&periodo=eq.${periodo}`, 'DELETE');
+    if (delResult === null && sbOnline !== false) {
+      // Falhou mas não está offline - retry
+      if (retries > 0) {
+        await new Promise(r => setTimeout(r, 300));
+        return saveEscala(funcId, periodo, valores, retries - 1);
+      }
+      return false;
     }
-  }
-  if (rows.length > 0) {
-    await sbFetch('escalas', 'POST', rows);
+    // Insert each day as a separate row
+    const rows = [];
+    for (let i = 0; i < valores.length; i++) {
+      if (valores[i]) {
+        rows.push({ funcionario_id: funcId, periodo: periodo, dia: i, status: valores[i], atualizado_por: loggedUser ? getLogName() : '' });
+      }
+    }
+    if (rows.length > 0) {
+      const insResult = await sbFetch('escalas', 'POST', rows);
+      if (insResult === null && sbOnline !== false) {
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 300));
+          return saveEscala(funcId, periodo, valores, retries - 1);
+        }
+        return false;
+      }
+    }
+    return true;
+  } catch(e) {
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 300));
+      return saveEscala(funcId, periodo, valores, retries - 1);
+    }
+    return false;
   }
 }
 
@@ -2786,7 +2854,36 @@ function startPolling() {
   const ss = String(now.getSeconds()).padStart(2,'0');
   const badge = document.getElementById('lastUpdateText');
   if (badge) badge.textContent = 'Atualizado ' + hh + ':' + mm + ':' + ss;
-  pollingInterval = setInterval(pollUpdates, 30000); // 30 segundos
+  pollingInterval = setInterval(pollUpdates, 5000); // 5 segundos
+}
+
+let _manualRefreshRunning = false;
+async function manualRefresh() {
+  if (_manualRefreshRunning) return;
+  _manualRefreshRunning = true;
+  const icon = document.getElementById('refreshIcon');
+  const text = document.getElementById('lastUpdateText');
+  if (icon) { icon.style.display = 'inline-block'; icon.style.transition = 'transform 0.6s linear'; icon.style.transform = 'rotate(360deg)'; }
+  if (text) text.textContent = 'Atualizando...';
+  try {
+    // Recarregar tudo do Supabase
+    await loadData();
+    renderApp();
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    const ss = String(now.getSeconds()).padStart(2,'0');
+    if (text) text.textContent = 'Atualizado ' + hh + ':' + mm + ':' + ss;
+    showToast('✅ Dados atualizados!', 'success');
+  } catch(e) {
+    if (text) text.textContent = 'Erro ao atualizar';
+    showToast('❌ Erro ao atualizar', 'error');
+  } finally {
+    setTimeout(() => {
+      if (icon) icon.style.transform = 'rotate(0deg)';
+      _manualRefreshRunning = false;
+    }, 600);
+  }
 }
 
 function stopPolling() {
